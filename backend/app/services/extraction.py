@@ -27,7 +27,7 @@ def extract_tender_structured_data(full_text: str, document_name: str = "") -> d
     and applies currency/metric normalization.
     """
     prompt_template = load_extraction_prompt()
-    prompt = prompt_template.format(document_text=full_text[:12000])  # Cap context window if extremely long
+    prompt = prompt_template.format(document_text=full_text[:12000])
 
     try:
         res = llm_client.generate_structured(
@@ -37,9 +37,7 @@ def extract_tender_structured_data(full_text: str, document_name: str = "") -> d
         extracted: TenderExtractionSchema = res["data"]
         usage = res["usage"]
 
-        # Post-normalization fallback & enforcement
         if extracted.emd_amount and extracted.emd_amount < 1000:
-            # Check if needs crore/lakh multiplier normalization
             normalized_emd, _ = normalize_currency_to_inr(str(extracted.emd_amount))
             if normalized_emd:
                 extracted.emd_amount = normalized_emd
@@ -66,7 +64,6 @@ def extract_tender_structured_data(full_text: str, document_name: str = "") -> d
 
     except Exception as e:
         logger.error(f"Structured extraction failed for {document_name}: {e}")
-        # Rule fallback: Regex-heuristic fallback extraction if LLM call is mocked or fails
         return heuristic_fallback_extraction(full_text, document_name)
 
 
@@ -84,8 +81,6 @@ def heuristic_fallback_extraction(full_text: str, document_name: str) -> dict[st
     """
     import re
 
-    # 1. Title & Authority — if regex can't find a real title/authority, say so
-    # explicitly rather than returning a title that reads like a real one.
     title = f"[MANUAL REVIEW REQUIRED] Extraction failed for {document_name}"
     title_match = re.search(r'(Procurement|Selection|Contract|Operation)[^\n]+', full_text, re.IGNORECASE)
     if title_match:
@@ -96,9 +91,6 @@ def heuristic_fallback_extraction(full_text: str, document_name: str) -> dict[st
     if auth_match:
         authority = auth_match.group(1).strip()
 
-    # 2. Location (City / State) — no default city/state; both fields are
-    # Optional in the schema, so "we don't know" is represented as None,
-    # not as a randomly chosen real city.
     city = None
     state = None
     _known_locations = [
@@ -111,10 +103,6 @@ def heuristic_fallback_extraction(full_text: str, document_name: str) -> dict[st
             city, state = city_name, state_name
             break
 
-    # 3. Deadline extraction — submission_deadline is a required string field,
-    # so we can't leave it None. If we can't find a real date, the value must
-    # be unmistakably a placeholder, not a real-looking future date, so no
-    # downstream code mistakes it for an actual extracted deadline.
     deadline = "UNKNOWN — VERIFY MANUALLY (automated extraction failed)"
     dead_match = re.search(r'(\d{2}-[A-Za-z]+-20\d{2})', full_text)
     if dead_match:
@@ -127,19 +115,16 @@ def heuristic_fallback_extraction(full_text: str, document_name: str) -> dict[st
                 f"{document_name} but could not be parsed; leaving as UNKNOWN."
             )
 
-    # 4. Fleet size — only set if actually found in text.
     fleet = None
     fleet_match = re.search(r'fleet\s*size\s*of\s*(\d+)|(\d+)\s*buses', full_text, re.IGNORECASE)
     if fleet_match:
         fleet = int(fleet_match.group(1) or fleet_match.group(2))
 
-    # 5. Turnover (INR) — only set if actually found in text.
     turnover = None
     turn_match = re.search(r'(\d+)\s*Crore', full_text, re.IGNORECASE)
     if turn_match:
         turnover = float(turn_match.group(1)) * 10_000_000.0
 
-    # 6. EMD amount — only set if actually found in text.
     emd = None
     emd_match = re.search(r'EMD[^\n\d]*([\d\.,]+)\s*(Lakhs|Lakh|Crore|Lakhs\s*only)?', full_text, re.IGNORECASE)
     if emd_match:
@@ -153,7 +138,6 @@ def heuristic_fallback_extraction(full_text: str, document_name: str) -> dict[st
         except ValueError:
             pass
 
-    # 7. Experience — only set if actually found in text.
     exp = None
     exp_match = re.search(r'(\d+)\s*years', full_text, re.IGNORECASE)
     if exp_match:
@@ -177,9 +161,6 @@ def heuristic_fallback_extraction(full_text: str, document_name: str) -> dict[st
             "minimum_fleet_size": fleet,
             "minimum_annual_turnover": turnover,
             "minimum_experience_years": exp,
-            # Deliberately NOT derived as turnover * 0.5 — that was a guess
-            # dressed up as a value. Leave unset; screening treats an unset
-            # mandatory criterion as "not evaluated" rather than a false pass.
             "minimum_past_contract_value": None,
             "required_geographies": [state] if state else [],
             "other_requirements": [

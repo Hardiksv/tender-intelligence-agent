@@ -5,11 +5,9 @@ from datetime import UTC, datetime, timezone
 
 from app.core.config import settings
 
-# Setup standard logger
 logger = logging.getLogger("tender_agent")
 logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 
-# Console Handler
 handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 

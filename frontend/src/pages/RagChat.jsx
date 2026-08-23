@@ -54,8 +54,7 @@ export default function RagChat() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       
-      {/* Header */}
-      <div className="glass-card p-6 rounded-2xl border border-slate-800 flex items-center justify-between">
+            <div className="glass-card p-6 rounded-2xl border border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
             <Sparkles className="w-6 h-6" />
@@ -67,8 +66,7 @@ export default function RagChat() {
         </div>
       </div>
 
-      {/* Preset Questions */}
-      <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
         {sampleQuestions.map((sq, idx) => (
           <button
             key={idx}
@@ -80,8 +78,7 @@ export default function RagChat() {
         ))}
       </div>
 
-      {/* Chat Conversation History */}
-      <div className="glass-card p-6 rounded-2xl border border-slate-800 min-h-[420px] max-h-[600px] overflow-y-auto space-y-4">
+            <div className="glass-card p-6 rounded-2xl border border-slate-800 min-h-[420px] max-h-[600px] overflow-y-auto space-y-4">
         {messages.map((m, idx) => (
           <div key={idx} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-2xl rounded-2xl p-4 text-xs leading-relaxed ${
@@ -95,8 +92,7 @@ export default function RagChat() {
                 <>
                   <p className="whitespace-pre-wrap">{m.answer}</p>
 
-                  {/* Metadata Citations */}
-                  {m.citations && m.citations.length > 0 && (
+                                    {m.citations && m.citations.length > 0 && (
                     <div className="pt-3 border-t border-slate-800/80 space-y-2">
                       <div className="flex items-center gap-1.5 text-indigo-400 font-semibold text-[11px]">
                         <BookOpen className="w-3.5 h-3.5" />
@@ -130,8 +126,7 @@ export default function RagChat() {
         )}
       </div>
 
-      {/* Input Box */}
-      <form
+            <form
         onSubmit={(e) => { e.preventDefault(); handleSend(); }}
         className="glass-card p-2 rounded-2xl border border-slate-800 flex items-center gap-2"
       >

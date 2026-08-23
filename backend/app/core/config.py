@@ -9,26 +9,21 @@ class Settings(BaseSettings):
     Application Settings dynamically loaded from .env environment file.
     No hardcoded production settings reside in code.
     """
-    # Database Settings
     DATABASE_URL: str = "sqlite:///tender_intelligence.db"
     TEST_DATABASE_URL: str | None = None
 
-    # LLM Settings (Groq / LiteLLM)
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "groq/openai/gpt-oss-120b"
     LLM_FALLBACK_MODEL: str = "groq/qwen/qwen3.6-27b"
 
-    # Embeddings Settings (Jina AI / LiteLLM)
     EMBEDDING_API_KEY: str = ""
     EMBEDDING_MODEL: str = "jina-embeddings-v5-omni-small"
     EMBEDDING_DIMENSION: int = 768
 
-    # Application Settings
     TIMEZONE: str = "Asia/Kolkata"
     FRONTEND_ORIGIN: str = "http://localhost:5173"
     LOG_LEVEL: str = "INFO"
 
-    # Feature Flags & Automation
     INGESTION_ENABLED: bool = True
     DISCOVERY_ENABLED: bool = False
     DISCOVERY_INTERVAL_MINUTES: int = 60

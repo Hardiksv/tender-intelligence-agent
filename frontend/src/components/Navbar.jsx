@@ -42,8 +42,7 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
     <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80 px-6 py-4">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         
-        {/* Brand */}
-        <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <Bus className="w-5 h-5 text-white" />
           </div>
@@ -55,8 +54,7 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
+                <nav className="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -94,8 +92,7 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
           </button>
         </nav>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
           {jobProgress && ingesting && (
             <div className="text-xs text-indigo-300 bg-indigo-950/60 border border-indigo-800/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />

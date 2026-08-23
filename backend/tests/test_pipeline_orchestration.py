@@ -35,7 +35,6 @@ from app.schemas.extraction import TenderExtractionSchema, TenderEligibilitySche
 from app.schemas.screening import FinalVerdict, ScreeningResultSchema
 
 
-# ─── In-memory SQLite test DB fixture ────────────────────────────────────────
 
 @pytest.fixture(scope="module")
 def test_db():
@@ -51,9 +50,8 @@ def test_db():
     session.close()
 
 
-# ─── Shared fixtures ─────────────────────────────────────────────────────────
 
-FAKE_FILENAME = "cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf"  # real CATALOG key
+FAKE_FILENAME = "cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf"
 
 FAKE_CATALOG_ENTRY = {
     FAKE_FILENAME: {
@@ -137,7 +135,6 @@ def mock_screening_result():
     )
 
 
-# ─── TEST 1: Extraction is called from pipeline ──────────────────────────────
 
 def test_extraction_called_from_pipeline(minimal_parsed_doc, mock_extraction_result, mock_screening_result):
     """
@@ -179,19 +176,16 @@ def test_extraction_called_from_pipeline(minimal_parsed_doc, mock_extraction_res
         mock_job.failed_documents = 0
         mock_job.completed_documents = 0
 
-        # side_effect order: job lookup, tender lookup (None→create), document lookup (None→new doc)
-        # TenderEligibility lookup, CompanyProfile
         mock_db.query.return_value.filter.return_value.first.side_effect = [
-            mock_job,        # job lookup
-            None,            # tender lookup → create new
-            None,            # Document.document_hash duplicate check → not found
-            None,            # TenderEligibility lookup → not found
-            mock_profile,    # CompanyProfile (get_or_create_default_profile)
-            None,            # ScreeningResult check
+            mock_job,
+            None,
+            None,
+            None,
+            mock_profile,
+            None,
         ]
         mock_db.query.return_value.filter.return_value.count.return_value = 0
 
-        # Make flush/add/commit no-ops
         mock_tender_instance = MagicMock()
         mock_tender_instance.id = uuid.uuid4()
         mock_tender_instance.title = "Test Tender"
@@ -204,17 +198,14 @@ def test_extraction_called_from_pipeline(minimal_parsed_doc, mock_extraction_res
         from app.agent.pipeline import run_ingestion_pipeline
         run_ingestion_pipeline(job_id)
 
-        # KEY ASSERTION: extract_tender_structured_data WAS called
         assert mock_extract.call_count >= 1, (
             f"Expected extract_tender_structured_data to be called at least once. "
             f"Called {mock_extract.call_count} times."
         )
-        # Verify it received the full_text from the parsed doc
         call_args = mock_extract.call_args
         assert FAKE_FILENAME in call_args[0][1]
 
 
-# ─── TEST 2: Screening is called after extraction ────────────────────────────
 
 def test_screening_called_after_extraction(minimal_parsed_doc, mock_extraction_result, mock_screening_result):
     """
@@ -251,11 +242,11 @@ def test_screening_called_after_extraction(minimal_parsed_doc, mock_extraction_r
 
         mock_db.query.return_value.filter.return_value.first.side_effect = [
             mock_job,
-            None,        # tender not found
-            None,        # doc not found
-            None,        # eligibility not found
-            mock_profile,  # CompanyProfile
-            None,          # ScreeningResult check
+            None,
+            None,
+            None,
+            mock_profile,
+            None,
         ]
         mock_db.add.return_value = None
         mock_db.flush.return_value = None
@@ -264,18 +255,15 @@ def test_screening_called_after_extraction(minimal_parsed_doc, mock_extraction_r
         from app.agent.pipeline import run_ingestion_pipeline
         run_ingestion_pipeline(mock_job.id)
 
-        # KEY ASSERTION: screen_tender_eligibility WAS called
         assert mock_screen.call_count >= 1, (
             f"Expected screen_tender_eligibility to be called at least once. "
             f"Called {mock_screen.call_count} times."
         )
-        # AND it received the extracted eligibility (minimum_fleet_size=80)
         call_kwargs = mock_screen.call_args[1]
         assert call_kwargs["eligibility"].minimum_fleet_size == 80
         assert call_kwargs["eligibility"].minimum_annual_turnover == 1_200_000_000.0
 
 
-# ─── TEST 3: Extraction failure → heuristic fallback ─────────────────────────
 
 def test_extraction_failure_falls_back_to_heuristic():
     """
@@ -307,7 +295,6 @@ def test_extraction_llm_failure_uses_fallback(monkeypatch):
     assert result["model"] == "heuristic-fallback"
 
 
-# ─── TEST 4: Screening handles empty eligibility correctly ────────────────────
 
 def test_screening_service_handles_empty_eligibility_as_review():
     """
@@ -320,16 +307,15 @@ def test_screening_service_handles_empty_eligibility_as_review():
     from app.schemas.profile import CompanyProfileBase
     from app.schemas.extraction import TenderEligibilitySchema
 
-    empty_elig = TenderEligibilitySchema()  # all numeric fields are None
+    empty_elig = TenderEligibilitySchema()
     profile = CompanyProfileBase(
         fleet_size=120, annual_turnover=150_000_000.0,
         years_experience=7, past_contract_sizes=[],
-        preferred_geographies=[]   # empty → geography not matched → REVIEW
+        preferred_geographies=[]
     )
     result = screen_tender_eligibility(
         "t-999", "Empty Criteria Tender", "Rajasthan", empty_elig, profile
     )
-    # Geography criterion fires → REVIEW is correct (no mandatory failures)
     assert result.verdict == FinalVerdict.REVIEW
     assert len(result.criteria_results) == 1
     assert result.criteria_results[0].criterion_name == "Preferred Geography"
@@ -351,13 +337,12 @@ def test_screening_service_go_when_no_state():
         preferred_geographies=["Rajasthan"]
     )
     result = screen_tender_eligibility(
-        "t-000", "No State Tender", "", empty_elig, profile  # empty state
+        "t-000", "No State Tender", "", empty_elig, profile
     )
     assert result.verdict == FinalVerdict.GO
     assert len(result.criteria_results) == 0
 
 
-# ─── TEST 5: End-to-end: extracted eligibility → screening verdict ────────────
 
 def test_e2e_extracted_elig_to_screening_verdict():
     """
@@ -369,20 +354,17 @@ def test_e2e_extracted_elig_to_screening_verdict():
     from app.schemas.profile import CompanyProfileBase
     from app.schemas.extraction import TenderEligibilitySchema
 
-    # Company profile (matches default seeded profile)
     profile = CompanyProfileBase(
         fleet_size=120,
-        annual_turnover=150_000_000.0,  # 15 Cr
+        annual_turnover=150_000_000.0,
         years_experience=7,
         past_contract_sizes=[75_000_000.0, 90_000_000.0],
         preferred_geographies=["Rajasthan", "Haryana", "Delhi"]
     )
 
-    # Extracted eligibility from JCTSL tender
-    # Requires turnover 22.5Cr > company 15Cr → FAIL → NO-GO
     extracted_elig = TenderEligibilitySchema(
         minimum_fleet_size=80,
-        minimum_annual_turnover=225_000_000.0,  # 22.5 Cr > 15 Cr → FAIL
+        minimum_annual_turnover=225_000_000.0,
         minimum_experience_years=3,
         minimum_past_contract_value=60_000_000.0,
         required_geographies=["Rajasthan"]
@@ -404,7 +386,6 @@ def test_e2e_extracted_elig_to_screening_verdict():
     assert turnover_criterion.verdict.value == "FAIL"
 
 
-# ─── TEST 6: Idempotency — no duplicate TenderEligibility records ─────────────
 
 def test_idempotency_no_duplicate_eligibility_records(test_db):
     """
@@ -422,7 +403,7 @@ def test_idempotency_no_duplicate_eligibility_records(test_db):
         title="Idempotency Test Tender",
         issuing_authority="Test Authority",
         category="bus_operations",
-        submission_deadline=deadline,   # datetime, not string
+        submission_deadline=deadline,
         raw_document_path="/fake/path.pdf",
         document_hash="idem" + "a" * 60,
         scope_summary="Test scope"
@@ -430,7 +411,6 @@ def test_idempotency_no_duplicate_eligibility_records(test_db):
     test_db.add(tender)
     test_db.flush()
 
-    # First run: no existing eligibility → create
     elig1 = TenderEligibility(
         tender_id=tender.id,
         minimum_fleet_size=80,
@@ -443,7 +423,6 @@ def test_idempotency_no_duplicate_eligibility_records(test_db):
     test_db.add(elig1)
     test_db.flush()
 
-    # Second run: existing found → UPDATE not INSERT (pipeline behaviour)
     existing_elig = test_db.query(TenderEligibility).filter(
         TenderEligibility.tender_id == tender.id
     ).first()
@@ -451,7 +430,7 @@ def test_idempotency_no_duplicate_eligibility_records(test_db):
         elig2 = TenderEligibility(tender_id=tender.id, minimum_fleet_size=90)
         test_db.add(elig2)
     else:
-        existing_elig.minimum_fleet_size = 90  # update in-place
+        existing_elig.minimum_fleet_size = 90
 
     test_db.flush()
 
@@ -480,7 +459,7 @@ def test_idempotency_screening_multiple_runs_no_duplicates(test_db):
         title="Idempotency Screening Tender",
         issuing_authority="Test Authority",
         category="bus_operations",
-        submission_deadline=deadline,    # datetime, not string
+        submission_deadline=deadline,
         raw_document_path="/fake/path2.pdf",
         document_hash="idem2" + "b" * 59,
         scope_summary="Test scope"
@@ -499,7 +478,6 @@ def test_idempotency_screening_multiple_runs_no_duplicates(test_db):
         required_geographies=["Delhi"]
     )
 
-    # First run: no existing → create
     existing = test_db.query(ScreeningResult).filter(
         ScreeningResult.tender_id == tender.id
     ).first()
@@ -519,7 +497,6 @@ def test_idempotency_screening_multiple_runs_no_duplicates(test_db):
     ).count()
     assert count_after_first == 1
 
-    # Second run: existing found → pipeline skips (does NOT insert again)
     existing2 = test_db.query(ScreeningResult).filter(
         ScreeningResult.tender_id == tender.id
     ).first()

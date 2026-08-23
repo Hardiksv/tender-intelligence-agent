@@ -98,26 +98,20 @@ class Tender(Base):
     state = Column(String(100), nullable=True)
     category = Column(String(100), default="bus_operations", nullable=False)
 
-    # Bus Quantity Resolution (Original vs Latest Amended)
     original_bus_quantity = Column(Integer, nullable=True)
     latest_bus_quantity = Column(Integer, nullable=True)
     latest_quantity_source = Column(String(300), nullable=True)
 
-    # Deadline Resolution (Original vs Latest Amended)
     submission_deadline = Column(DateTime(timezone=True), nullable=False)
     original_deadline = Column(DateTime(timezone=True), nullable=True)
     latest_deadline = Column(DateTime(timezone=True), nullable=True)
     latest_deadline_source = Column(String(300), nullable=True)
     timezone = Column(String(50), default="Asia/Kolkata", nullable=False)
 
-    # EMD Resolution (Original vs Latest Amended)
-    # emd_amount holds the CUMULATIVE total across all lots (scalar, used for screening comparisons)
     emd_amount = Column(Numeric(15, 2), nullable=True)
     original_emd_amount = Column(Numeric(15, 2), nullable=True)
     latest_emd_amount = Column(Numeric(15, 2), nullable=True)
     latest_emd_source = Column(String(300), nullable=True)
-    # emd_breakdown holds the lot-wise structure as {"StateOrLot": amount_in_inr_crores, ...}
-    # Reflects actual CESL EMD which is always state/lot-wise, not a flat amount
     emd_breakdown = Column(JSONType, nullable=True)
 
     document_fee = Column(Numeric(15, 2), nullable=True)
@@ -127,13 +121,11 @@ class Tender(Base):
     raw_document_path = Column(String(1000), nullable=False)
     document_hash = Column(String(64), unique=True, nullable=False, index=True)
 
-    # Provenance tracking for every extracted field
     extraction_provenance = Column(JSONType, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
 
-    # Relationships
     eligibility = relationship("TenderEligibility", back_populates="tender", uselist=False, cascade="all, delete-orphan")
     screening_results = relationship("ScreeningResult", back_populates="tender", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="tender", cascade="all, delete-orphan")
@@ -151,7 +143,6 @@ class TenderEligibility(Base):
     minimum_past_contract_value = Column(Numeric(15, 2), nullable=True)
     minimum_depots_required = Column(Integer, nullable=True)
     required_geographies = Column(JSONType, nullable=True)
-    # other_requirements contains items with explicit is_mandatory: bool
     other_requirements = Column(JSONType, nullable=True)
 
     tender = relationship("Tender", back_populates="eligibility")
@@ -188,8 +179,8 @@ class Document(Base):
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
     tender_id = Column(GUID, ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False)
     file_name = Column(String(255), nullable=False)
-    document_type = Column(String(50), nullable=False, default="ORIGINAL_RFP")  # ORIGINAL_RFP, AMENDMENT, CORRIGENDUM, CLARIFICATION
-    amendment_number = Column(String(50), nullable=True)  # e.g., "Amendment 5"
+    document_type = Column(String(50), nullable=False, default="ORIGINAL_RFP")
+    amendment_number = Column(String(50), nullable=True)
     source_url = Column(String(1000), nullable=True)
     page_count = Column(Integer, nullable=False, default=0)
     document_hash = Column(String(64), nullable=False)

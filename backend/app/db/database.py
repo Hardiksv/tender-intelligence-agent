@@ -9,7 +9,6 @@ from app.core.logging import logger
 
 
 def get_engine():
-    # Use configured DATABASE_URL directly
     if settings.DATABASE_URL.startswith("postgresql"):
         engine = create_engine(
             settings.DATABASE_URL,
@@ -20,7 +19,6 @@ def get_engine():
         )
         return engine
 
-    # Fallback to local SQLite database (uses /tmp on Vercel serverless)
     if os.environ.get("VERCEL"):
         import shutil
         tmp_db = "/tmp/tender_intelligence.db"

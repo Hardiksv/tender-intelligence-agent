@@ -16,7 +16,6 @@ def test_health_check_endpoint():
 
 
 def test_cost_tracking_dynamic_pricing():
-    # 10,000 input tokens, 2,000 output tokens
     usage = {
         "prompt_tokens": 10000,
         "completion_tokens": 2000,
@@ -25,9 +24,6 @@ def test_cost_tracking_dynamic_pricing():
     }
     cost_info = calculate_llm_cost(usage)
 
-    # Input: 10k * $0.30 / 1M = $0.003
-    # Output: 2k * $2.50 / 1M = $0.005
-    # Total USD = $0.008
     assert cost_info["cost_usd"] == 0.008
     assert cost_info["prompt_tokens"] == 10000
     assert cost_info["completion_tokens"] == 2000

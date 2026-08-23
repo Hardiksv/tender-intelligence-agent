@@ -8,16 +8,11 @@ from app.llm.client import llm_client
 from app.schemas.chat import ChatRequest, ChatResponse, Citation
 from app.services.retrieval import retrieve_relevant_context
 
-# Prompts are versioned as files under backend/prompts/, not pasted inline at
-# runtime — this mirrors app/services/extraction.py's load_extraction_prompt().
 PROMPT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "prompts", "rag.md"
 )
 
-# Used only if prompts/rag.md is ever missing (e.g. a stripped-down deploy) —
-# kept in sync with prompts/rag.md, never the source of truth while that file
-# exists.
 _FALLBACK_RAG_PROMPT = """You are a grounded Tender Intelligence AI assistant.
 
 Answer the user's question strictly using ONLY the provided structured tender facts and tender document context.
@@ -77,11 +72,9 @@ def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
             }
         )
 
-    # Format context string
     formatted_context_list = []
     citations: list[Citation] = []
 
-    # Structured tender facts are authoritative for direct factual fields.
     if tender:
         structured_context = f"""
 --- STRUCTURED TENDER FACTS ---
@@ -108,8 +101,6 @@ Timezone: {tender.timezone}
         formatted_context_list.append(structured_context)
 
     for idx, item in enumerate(context_chunks, start=1):
-        # Prevent oversized prompts from exceeding the LLM provider TPM limit.
-        # Keep enough text for evidence while avoiding entire long document chunks.
         chunk_text = item["text"][:1800]
 
         formatted_context_list.append(
@@ -134,7 +125,6 @@ Timezone: {tender.timezone}
                 )
             )
         )
-         # Remove duplicate citations while preserving order.
     unique_citations = []
     seen_citations = set()
 
@@ -156,7 +146,6 @@ Timezone: {tender.timezone}
     prompt = prompt_template.replace("{context}", context_str).replace("{question}", request.question)
 
     try:
-        # Call LLM for grounded completion over genuine retrieved context
         res = llm_client.generate(prompt=prompt, temperature=0.0)
 
         log_action(

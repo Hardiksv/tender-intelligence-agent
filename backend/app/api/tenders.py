@@ -143,7 +143,7 @@ async def list_tenders(
     verdict: str | None = Query(default=None, description="Filter tenders by GO / NO-GO / REVIEW verdict"),
     search: str | None = Query(default=None, description="Search term in title or authority"),
     city: str | None = Query(default=None, description="Filter tenders by city"),
-    db: Session = Depends(get_db)  # noqa: B008
+    db: Session = Depends(get_db)
 ):
     state_val = state if isinstance(state, str) else None
     verdict_val = verdict if isinstance(verdict, str) else None
@@ -189,18 +189,12 @@ async def list_tenders(
         except Exception as e:
             logger.warning(f"Error formatting database tenders: {e}")
 
-    # Serverless Catalog Fallback — used only when DB is empty (not yet ingested).
-    # Screening is run through the REAL deterministic screen_tender_eligibility()
-    # engine (services/screening.py) against the company profile. No hardcoded
-    # verdicts or fabricated numbers — the screening logic here is exactly the
-    # same code path as post-ingestion DB-backed screening.
     import hashlib
     import uuid
     from datetime import datetime
 
     from app.agent.pipeline import CATALOG
 
-    # Build company profile (same defaults as DB-backed screening)
     try:
         profile_db = get_or_create_default_profile(db)
         profile = CompanyProfileBase(
@@ -246,7 +240,6 @@ async def list_tenders(
         doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
         t_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
 
-        # Eligibility from CATALOG metadata (hand-verified ground truth)
         cat_elig = meta.get("eligibility") or {}
         geo = [meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"]
         elig_schema = TenderEligibilitySchema(
@@ -265,7 +258,6 @@ async def list_tenders(
             ]
         )
 
-        # Run real deterministic screening engine — same code path as DB-backed
         try:
             s_result = screen_tender_eligibility(
                 tender_id=t_id,
@@ -275,8 +267,6 @@ async def list_tenders(
                 profile=profile
             )
             verdict_str = s_result.verdict.value if hasattr(s_result.verdict, "value") else str(s_result.verdict)
-            # Map CriterionDetail fields to the frontend-expected dict schema:
-            # criterion_name → criterion, verdict (enum) → status, reason → details
             criteria_list = [
                 {
                     "criterion": c.criterion_name,
@@ -341,7 +331,7 @@ async def list_tenders(
 
 
 @router.get("/daily-digest")
-async def get_daily_digest(db: Session = Depends(get_db)):  # noqa: B008
+async def get_daily_digest(db: Session = Depends(get_db)):
     tenders = db.query(Tender).order_by(Tender.submission_deadline.asc()).all()
     formatted = [format_tender_response(t) for t in tenders]
 
@@ -377,7 +367,7 @@ async def get_daily_digest(db: Session = Depends(get_db)):  # noqa: B008
 
 
 @router.get("/{tender_id}", response_model=TenderResponse)
-async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):  # noqa: B008
+async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
     t = None
     try:
         t = db.query(Tender).filter(Tender.id == tender_id).first()
@@ -391,7 +381,6 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):  # no
         except Exception as e:
             logger.warning(f"Failed formatting database tender {tender_id}: {e}")
 
-    # Serverless Catalog Fallback
     import hashlib
     import uuid
 
@@ -417,7 +406,6 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):  # no
             is_expired = time_diff.total_seconds() < 0
             doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
 
-            # Build profile and eligibility, then run real screening engine
             from app.agent.pipeline import get_or_create_default_profile
             from app.schemas.extraction import (
                 OtherRequirementItem,
@@ -464,7 +452,6 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):  # no
                     tender_state=meta.get("state"), eligibility=elig_schema, profile=profile
                 )
                 verdict_str = s_result.verdict.value if hasattr(s_result.verdict, "value") else str(s_result.verdict)
-                # Map CriterionDetail fields to frontend-expected keys
                 criteria_list = [
                     {
                         "criterion": c.criterion_name,

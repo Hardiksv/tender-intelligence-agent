@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/tenders", tags=["Screening"])
 
 
 @router.get("/{tender_id}/screening", response_model=ScreeningResultSchema)
-async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):  # noqa: B008
+async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):
     t = None
     try:
         t = db.query(Tender).filter(Tender.id == tender_id).first()
@@ -33,7 +33,6 @@ async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):  
                 screened_at=latest_s.screened_at.isoformat()
             )
 
-    # Serverless fallback
     import uuid
 
     from app.agent.pipeline import CATALOG
@@ -80,7 +79,7 @@ async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):  
 
 
 @router.post("/{tender_id}/screen", response_model=ScreeningResultSchema)
-async def run_tender_screening(tender_id: str, db: Session = Depends(get_db)):  # noqa: B008
+async def run_tender_screening(tender_id: str, db: Session = Depends(get_db)):
     t = db.query(Tender).filter(Tender.id == tender_id).first()
     if not t or not t.eligibility:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tender or eligibility details not found")

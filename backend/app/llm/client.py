@@ -11,7 +11,6 @@ from app.llm.base import AbstractLLMClient
 
 T = TypeVar("T", bound=BaseModel)
 
-# Configure LiteLLM global settings
 litellm.drop_params = True
 
 
@@ -64,7 +63,6 @@ class LiteLLMClient(AbstractLLMClient):
                 os.environ["GEMINI_API_KEY"] = settings.LLM_API_KEY
                 os.environ["GOOGLE_API_KEY"] = settings.LLM_API_KEY
 
-        # Try models in priority order
         models_to_try = [
             self.primary_model,
             self.fallback_model,
@@ -72,7 +70,6 @@ class LiteLLMClient(AbstractLLMClient):
             "groq/qwen/qwen3.6-27b",
             "groq/openai/gpt-oss-20b"
         ]
-        # Remove duplicates preserving order
         models_to_try = list(dict.fromkeys(models_to_try))
         last_error = None
 
@@ -99,8 +96,6 @@ class LiteLLMClient(AbstractLLMClient):
                 last_error = e
                 logger.warning(f"LiteLLM call to model '{model}' failed: {e}. Trying fallback if available.")
 
-                # Never return hardcoded or fabricated tender information.
-        # Surface the real provider failure instead.
         logger.error(
             f"ALL LLM MODELS FAILED. "
             f"LAST ERROR TYPE={type(last_error).__name__}, "
@@ -134,7 +129,6 @@ class LiteLLMClient(AbstractLLMClient):
                 os.environ["GOOGLE_API_KEY"] = settings.LLM_API_KEY
 
         models_to_try = [self.primary_model, self.fallback_model, "groq/openai/gpt-oss-120b", "groq/qwen/qwen3.6-27b"]
-        # Remove duplicates preserving order
         models_to_try = list(dict.fromkeys(models_to_try))
         last_error = None
 
@@ -164,10 +158,6 @@ class LiteLLMClient(AbstractLLMClient):
                 logger.warning(f"Structured LiteLLM call failed with model '{model}': {e}")
                 last_error = e
 
-        # Do NOT return fabricated/hardcoded tender facts, and do NOT fall off
-        # the end of the function returning None — a caller expecting a dict
-        # with a "data" key would hit an unhandled AttributeError instead of a
-        # clear, catchable failure. Surface the real provider failure instead.
         logger.error(
             f"ALL STRUCTURED LLM MODELS FAILED. "
             f"LAST ERROR TYPE={type(last_error).__name__}, "
@@ -180,5 +170,4 @@ class LiteLLMClient(AbstractLLMClient):
         )
 
 
-# Singleton LLM Client
 llm_client = LiteLLMClient()

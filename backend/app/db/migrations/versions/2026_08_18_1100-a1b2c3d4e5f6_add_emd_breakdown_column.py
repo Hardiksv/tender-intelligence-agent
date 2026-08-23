@@ -12,7 +12,6 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-# revision identifiers, used by Alembic.
 revision: str = 'a1b2c3d4e5f6'
 down_revision: str | None = '5760beb5b967'
 branch_labels: str | Sequence[str] | None = None
@@ -20,9 +19,6 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Add emd_breakdown JSONB column: stores lot-wise EMD amounts as
-    # {"StateName": amount_in_inr_crores, ...} matching real CESL tender structure.
-    # emd_amount (existing scalar) is updated to hold the correct cumulative total.
     op.add_column(
         'tenders',
         sa.Column(

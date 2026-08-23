@@ -9,9 +9,9 @@ from app.services.screening import screen_tender_eligibility
 def base_profile():
     return CompanyProfileBase(
         fleet_size=120,
-        annual_turnover=150000000.0,  # 15 Cr
+        annual_turnover=150000000.0,
         years_experience=7,
-        past_contract_sizes=[75000000.0, 90000000.0],  # 7.5 Cr, 9 Cr
+        past_contract_sizes=[75000000.0, 90000000.0],
         preferred_geographies=["Rajasthan", "Haryana", "Delhi"]
     )
 
@@ -19,9 +19,9 @@ def base_profile():
 def test_all_pass_gives_go(base_profile):
     eligibility = TenderEligibilitySchema(
         minimum_fleet_size=100,
-        minimum_annual_turnover=120000000.0,  # 12 Cr
+        minimum_annual_turnover=120000000.0,
         minimum_experience_years=5,
-        minimum_past_contract_value=60000000.0,  # 6 Cr
+        minimum_past_contract_value=60000000.0,
         required_geographies=["Rajasthan"]
     )
     result = screen_tender_eligibility("test-001", "Sample Tender", "Rajasthan", eligibility, base_profile)
@@ -31,7 +31,7 @@ def test_all_pass_gives_go(base_profile):
 def test_mandatory_fail_gives_nogo(base_profile):
     eligibility = TenderEligibilitySchema(
         minimum_fleet_size=100,
-        minimum_annual_turnover=200000000.0,  # 20 Cr > 15 Cr profile (FAIL)
+        minimum_annual_turnover=200000000.0,
         minimum_experience_years=5,
         minimum_past_contract_value=60000000.0,
         required_geographies=["Rajasthan"]
@@ -49,7 +49,7 @@ def test_mandatory_fail_plus_review_gives_nogo_precedence(base_profile):
     """
     eligibility = TenderEligibilitySchema(
         minimum_fleet_size=100,
-        minimum_annual_turnover=200000000.0,  # 20 Cr > 15 Cr profile (FAIL)
+        minimum_annual_turnover=200000000.0,
         minimum_experience_years=5,
         minimum_past_contract_value=60000000.0,
         required_geographies=["Punjab"]
@@ -65,7 +65,7 @@ def test_all_mandatory_pass_plus_review_gives_review(base_profile):
     """
     eligibility = TenderEligibilitySchema(
         minimum_fleet_size=100,
-        minimum_annual_turnover=120000000.0,  # 12 Cr < 15 Cr (PASS)
+        minimum_annual_turnover=120000000.0,
         minimum_experience_years=5,
         minimum_past_contract_value=60000000.0,
         required_geographies=["Punjab"],

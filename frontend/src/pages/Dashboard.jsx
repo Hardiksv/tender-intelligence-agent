@@ -56,8 +56,7 @@ const expiredCount = tenders.filter(
   return (
     <div className="space-y-6">
       
-      {/* Top Banner & Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         
         <div className="glass-card p-5 rounded-2xl border border-slate-800">
           <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Tenders</p>
@@ -93,8 +92,7 @@ const expiredCount = tenders.filter(
 
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
+            <div className="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
         
         <div className="relative w-full md:w-96">
           <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
@@ -138,8 +136,7 @@ const expiredCount = tenders.filter(
 
       </div>
 
-      {/* Tender List Grid */}
-      {loading ? (
+            {loading ? (
         <div className="text-center py-16 text-slate-400">
           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-sm">Loading bus operations tenders...</p>

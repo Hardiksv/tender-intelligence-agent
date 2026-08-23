@@ -28,7 +28,6 @@ SEED_DATA_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "raw")
 )
 
-# Catalog mapping files to parent tender opportunities & child metadata
 def get_or_create_default_profile(db: Session) -> CompanyProfile:
     profile = db.query(CompanyProfile).first()
     if not profile:
@@ -310,15 +309,12 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
             try:
                 parsed_doc = parse_pdf_document(pdf_path)
 
-                # Parent-child resolution: Find or create parent Tender
                 tender_ref = meta["tender_ref"]
                 tender = db.query(Tender).filter(Tender.tender_ref == tender_ref).first()
 
                 if not tender:
-                    # Find parent metadata in CATALOG if this is a child document
                     parent_meta = meta
                     if not meta["is_parent"]:
-                        # Find parent entry in CATALOG
                         for mdata in CATALOG.values():
                             if mdata.get("tender_ref") == tender_ref and mdata.get("is_parent"):
                                 parent_meta = mdata
@@ -370,7 +366,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                     db.flush()
                     logger.info(f"Created Parent Tender Opportunity: {tender_ref}")
                 else:
-                    # Refresh parent metadata & EMD/deadline values on re-ingestion
                     parent_meta = meta if meta["is_parent"] else next((m for m in CATALOG.values() if m.get("tender_ref") == tender_ref and m.get("is_parent")), meta)
                     deadline_dt = datetime.fromisoformat(parent_meta["submission_deadline"])
                     tender.submission_deadline = deadline_dt
@@ -390,7 +385,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                         "page_number": 1
                     }
 
-                    # Update parent tender if amendment introduces a latest value
                     if "latest_bus_quantity" in meta and not meta["is_parent"]:
                         tender.latest_bus_quantity = meta["latest_bus_quantity"]
                         tender.latest_quantity_source = meta.get("latest_quantity_source", meta.get("amendment_number"))
@@ -404,7 +398,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                         db.flush()
                         logger.info(f"Updated Parent Tender {tender_ref} with latest quantity {meta['latest_bus_quantity']} from {file_name}")
 
-                # Create child Document record (linked to parent Tender)
                 existing_doc = db.query(Document).filter(Document.document_hash == parsed_doc["document_hash"]).first()
                 if existing_doc:
                     logger.info(f"Document {file_name} already exists. Verifying extraction & screening state.")
@@ -468,7 +461,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                 db.add(doc_record)
                 db.flush()
 
-                # Stage 5: Structured Extraction & TenderEligibility Storage
                 extraction_res = extract_tender_structured_data(parsed_doc["full_text"], file_name)
                 extracted_data = extraction_res["extraction"]
                 extracted_elig = extracted_data.eligibility
@@ -502,7 +494,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                         elig_record.other_requirements = other_reqs_data
                 db.flush()
 
-                # Stage 6: Chunking & Embeddings (linking every chunk to parent Tender AND child Document)
                 raw_chunks = chunk_document_pages(parsed_doc["pages"])
                 chunk_texts = [c["chunk_text"] for c in raw_chunks]
                 embeddings = generate_embeddings_batch(chunk_texts)
@@ -526,7 +517,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
 
                 db.flush()
 
-                # Stage 7: Automated Screening against Company Profile
                 profile_db = get_or_create_default_profile(db)
                 profile_base = CompanyProfileBase(
                     fleet_size=profile_db.fleet_size,

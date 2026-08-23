@@ -10,7 +10,6 @@ from app.core.exceptions import (
 )
 from app.core.logging import log_action, logger
 
-# Singleton SentenceTransformer instance for local embedding fallback
 _sentence_model = None
 
 
@@ -87,7 +86,6 @@ def generate_embedding(text: str) -> list[float]:
     model_name = settings.EMBEDDING_MODEL
     errors: list[str] = []
 
-    # 1. Primary Jina AI Embeddings Provider
     if "jina" in model_name or (hasattr(settings, "EMBEDDING_API_KEY") and settings.EMBEDDING_API_KEY.startswith("jina_")):
         try:
             results = _call_jina_api([text], task_type="retrieval.query")
@@ -97,7 +95,6 @@ def generate_embedding(text: str) -> list[float]:
             logger.warning(f"Jina AI embedding API call failed: {e}. Trying secondary provider.")
             errors.append(f"jina: {e}")
 
-    # 2. Secondary Cloud Embedding Provider (Gemini / Groq via LiteLLM)
     if vector is None and model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
         try:
             response = litellm.embedding(
@@ -117,7 +114,6 @@ def generate_embedding(text: str) -> list[float]:
             logger.warning(f"Cloud embedding API call ({model_name}) failed: {e}. Falling back to local model.")
             errors.append(f"cloud[{model_name}]: {e}")
 
-    # 3. Local SentenceTransformer Fallback (still a REAL embedding model, just local/offline)
     if vector is None:
         try:
             st_model = _get_sentence_transformer()
@@ -131,7 +127,6 @@ def generate_embedding(text: str) -> list[float]:
             logger.error(f"SentenceTransformer fallback error: {e}. No embedding provider succeeded.")
             errors.append(f"local_sentence_transformer: {e}")
 
-    # No provider produced a real vector -> fail loudly, do not fabricate one.
     if vector is None:
         raise EmbeddingGenerationException(
             "All embedding providers failed (Jina, cloud LiteLLM, local SentenceTransformer). "
@@ -139,7 +134,6 @@ def generate_embedding(text: str) -> list[float]:
             details={"errors": errors, "text_preview": text[:80]}
         )
 
-    # Dimension Validation Safeguard - Fails fast if dimension does not match
     if len(vector) != settings.EMBEDDING_DIMENSION:
         raise EmbeddingDimensionMismatchException(
             f"Generated vector dimension ({len(vector)}) does not match configured EMBEDDING_DIMENSION ({settings.EMBEDDING_DIMENSION})."
@@ -163,7 +157,6 @@ def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
     model_name = settings.EMBEDDING_MODEL
     errors: list[str] = []
 
-    # 1. Primary Jina AI Embeddings Batch Provider
     if "jina" in model_name or (hasattr(settings, "EMBEDDING_API_KEY") and settings.EMBEDDING_API_KEY.startswith("jina_")):
         try:
             vectors = _call_jina_api(texts, task_type="retrieval.passage")
@@ -172,7 +165,6 @@ def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
             errors.append(f"jina: {e}")
             vectors = []
 
-    # 2. Attempt batch embedding via LiteLLM if supported
     if not vectors and model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
         try:
             response = litellm.embedding(
@@ -194,7 +186,6 @@ def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
             errors.append(f"cloud[{model_name}]: {e}")
             vectors = []
 
-    # 3. Local SentenceTransformer Fallback
     if not vectors:
         try:
             st_model = _get_sentence_transformer()

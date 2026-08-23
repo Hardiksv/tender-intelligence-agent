@@ -64,8 +64,7 @@ const loadTender = async () => {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       
-      {/* Back Button */}
-      <button
+            <button
         onClick={onBack}
         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-medium transition-all"
       >
@@ -73,8 +72,7 @@ const loadTender = async () => {
         <span>Back to Tenders</span>
       </button>
 
-      {/* Header Banner */}
-      <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
+            <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className={`px-3 py-1 text-xs font-extrabold rounded-full border ${verdictBadgeColor}`}>
@@ -106,8 +104,7 @@ const loadTender = async () => {
         </div>
       </div>
 
-      {/* Screening Precedence Audit Panel */}
-      {screening && (
+            {screening && (
         <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
@@ -129,7 +126,6 @@ const loadTender = async () => {
             <strong className="text-slate-200">Verdict Rationale:</strong> {screening.reasoning}
           </div>
 
-{/* Detailed Criteria Audit Table */}
 <div className="overflow-x-auto">
   <table className="w-full text-left text-xs border-collapse">
     <thead>
@@ -180,8 +176,7 @@ const loadTender = async () => {
         </div>
       )}
 
-      {/* Scope Summary */}
-      <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-3">
+            <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-3">
         <div className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-indigo-400" />
           <h2 className="text-lg font-semibold text-white font-heading">Bus Operations Scope Summary</h2>

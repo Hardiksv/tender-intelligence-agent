@@ -24,7 +24,6 @@ def screen_tender_eligibility(
     """
     criteria: list[CriterionDetail] = []
 
-    # 1. Fleet Size Check (Mandatory)
     if eligibility.minimum_fleet_size is not None and eligibility.minimum_fleet_size > 0:
         if profile.fleet_size >= eligibility.minimum_fleet_size:
             v = CriterionVerdict.PASS
@@ -42,7 +41,6 @@ def screen_tender_eligibility(
             reason=reason
         ))
 
-    # 2. Annual Turnover Check (Mandatory)
     if eligibility.minimum_annual_turnover is not None and eligibility.minimum_annual_turnover > 0:
         if profile.annual_turnover >= eligibility.minimum_annual_turnover:
             v = CriterionVerdict.PASS
@@ -60,7 +58,6 @@ def screen_tender_eligibility(
             reason=reason
         ))
 
-    # 3. Operating Experience Check (Mandatory)
     if eligibility.minimum_experience_years is not None and eligibility.minimum_experience_years > 0:
         if profile.years_experience >= eligibility.minimum_experience_years:
             v = CriterionVerdict.PASS
@@ -78,7 +75,6 @@ def screen_tender_eligibility(
             reason=reason
         ))
 
-    # 4. Past Contract Value Check (Mandatory)
     if eligibility.minimum_past_contract_value is not None and eligibility.minimum_past_contract_value > 0:
         max_company_contract = max(profile.past_contract_sizes) if profile.past_contract_sizes else 0.0
         if max_company_contract >= eligibility.minimum_past_contract_value:
@@ -97,7 +93,6 @@ def screen_tender_eligibility(
             reason=reason
         ))
 
-    # 5. Geography Preference Check (Non-mandatory)
     if tender_state:
         if tender_state.lower() in [g.lower() for g in profile.preferred_geographies]:
             v = CriterionVerdict.PASS
@@ -115,7 +110,6 @@ def screen_tender_eligibility(
             reason=reason
         ))
 
-    # 6. Other Requirements Check
     if eligibility.other_requirements:
         for req in eligibility.other_requirements:
             criteria.append(CriterionDetail(
@@ -127,7 +121,6 @@ def screen_tender_eligibility(
                 reason=f"Qualitative requirement clause: '{req.requirement_text}'. Flagged for manual review."
             ))
 
-    # ENFORCE VERDICT PRECEDENCE: NO-GO > REVIEW > GO
     has_mandatory_failure = any(c.verdict == CriterionVerdict.FAIL and c.is_mandatory for c in criteria)
     has_any_review = any(c.verdict == CriterionVerdict.REVIEW for c in criteria)
 

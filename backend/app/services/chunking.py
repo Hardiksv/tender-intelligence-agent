@@ -21,7 +21,6 @@ def chunk_document_pages(
         if not page_text.strip():
             continue
 
-        # Split text into paragraphs / double line breaks
         paragraphs = re.split(r'\n\s*\n', page_text)
         current_chunk_text = ""
 
@@ -33,7 +32,6 @@ def chunk_document_pages(
             if len(current_chunk_text) + len(para) <= target_chunk_size:
                 current_chunk_text += ("\n\n" + para) if current_chunk_text else para
             else:
-                # Save current chunk
                 chunks.append({
                     "chunk_text": current_chunk_text,
                     "page_number": page_num,
@@ -45,7 +43,6 @@ def chunk_document_pages(
                 })
                 chunk_index += 1
 
-                # Start new chunk with overlap if possible
                 overlap_text = current_chunk_text[-overlap:] if len(current_chunk_text) > overlap else ""
                 current_chunk_text = (overlap_text + "\n\n" + para).strip()
 

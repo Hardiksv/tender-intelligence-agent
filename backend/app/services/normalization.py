@@ -13,7 +13,6 @@ def normalize_currency_to_inr(raw_value: str) -> tuple[float | None, str]:
     original_text = str(raw_value).strip()
     cleaned = original_text.lower().replace(",", "").replace("₹", "").replace("rs.", "").replace("rs", "").replace("inr", "").strip()
 
-    # Pattern for Crore (Cr)
     crore_match = re.search(r'([\d\.]+)\s*(crore|crores|cr)', cleaned)
     if crore_match:
         try:
@@ -22,7 +21,6 @@ def normalize_currency_to_inr(raw_value: str) -> tuple[float | None, str]:
         except ValueError:
             pass
 
-    # Pattern for Lakh (Lakhs, Lac, Lacs)
     lakh_match = re.search(r'([\d\.]+)\s*(lakh|lakhs|lac|lacs)', cleaned)
     if lakh_match:
         try:
@@ -31,7 +29,6 @@ def normalize_currency_to_inr(raw_value: str) -> tuple[float | None, str]:
         except ValueError:
             pass
 
-    # Direct numerical match
     num_match = re.search(r'([\d\.]+)', cleaned)
     if num_match:
         try:

@@ -41,9 +41,6 @@ def retrieve_relevant_context(
     query_type = route_query_type(question)
     retrieved_context: list[dict[str, Any]] = []
 
-        # Deterministic lexical retrieval for exact tender facts.
-    # This complements semantic search for questions about quantities,
-    # amendments, deadlines, EMD, etc., where exact numbers/names matter.
     q_lower = question.lower()
 
     if tender_id_filter and any(
@@ -70,8 +67,6 @@ def retrieve_relevant_context(
                 ])
 
             if "amendment" in q_lower or "amended" in q_lower:
-                # Retrieve amendment evidence only when the user is
-                # explicitly asking about amendments.
                 exact_terms.extend([
                     "Amendment No. 11",
                     "Amendment No. 12",
@@ -114,7 +109,6 @@ def retrieve_relevant_context(
             logger.warning(f"Lexical fact retrieval failed: {e}")
 
     if query_type == "STRUCTURED_SQL":
-        # Deadline query logic: tenders closing in next 15 days
         now_dt = datetime.now(UTC)
         stmt = select(Tender).where(Tender.submission_deadline >= now_dt)
         if tender_id_filter:
@@ -137,7 +131,6 @@ def retrieve_relevant_context(
                 "similarity_score": 1.0
             })
     else:
-        # Vector Similarity Search with error resilience
         query_vector = None
         try:
             query_vector = generate_embedding(question)
@@ -149,11 +142,6 @@ def retrieve_relevant_context(
                 is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
 
                 if is_postgres:
-                    # Use raw pgvector <=> operator (cosine distance) via literal_column.
-                    # DocumentChunk.embedding.cosine_distance() is unavailable because the
-                    # column uses a TypeDecorator (VectorType) which loses the pgvector
-                    # comparator. literal_column() creates a proper column expression
-                    # that can be labeled and used in ORDER BY.
                     vector_str = "[" + ",".join(str(float(v)) for v in query_vector) + "]"
                     cos_dist_expr = literal_column(
                         f"document_chunks.embedding <=> '{vector_str}'::vector"
@@ -201,7 +189,6 @@ def retrieve_relevant_context(
                             "similarity_score": similarity_score
                         })
                 else:
-                    # High-performance cosine similarity computation for SQLite / standalone mode
                     import numpy as np
                     q_arr = np.array(query_vector, dtype=np.float32)
                     q_norm = np.linalg.norm(q_arr)
@@ -222,7 +209,6 @@ def retrieve_relevant_context(
                         if isinstance(emb, list):
                             emb_arr = np.array(emb, dtype=np.float32)
                             
-                            # Handle dimension mismatch (e.g., legacy 384-dim chunks vs padded 768-dim query)
                             if len(q_arr) != len(emb_arr):
                                 min_dim = min(len(q_arr), len(emb_arr))
                                 q_compare = q_arr[:min_dim]
@@ -256,27 +242,7 @@ def retrieve_relevant_context(
             except Exception as e:
                 logger.warning(f"Vector search query failed: {e}")
 
-    # NOTE: There used to be a "Serverless Catalog Fallback" here that, when 0 chunks
-    # were found (e.g. on a fresh/ephemeral deployment with no seeded vector store),
-    # pulled facts from the hardcoded CATALOG dict in app/agent/pipeline.py, labeled
-    # them as retrieved chunks, and assigned them a fabricated keyword-overlap
-    # "similarity_score". That is exactly the kind of unsourced, non-grounded answer
-    # this assignment explicitly forbids ("Answers must be grounded in the stored
-    # documents, with citations. No unsourced claims."), and it silently disguised a
-    # missing/empty vector store as if retrieval had actually succeeded.
-    #
-    # If retrieved_context is empty here, that's the truth: either the DB has no
-    # embedded chunks yet, or nothing matched. rag.py already turns an empty list
-    # into "I could not find sufficient evidence in the stored tender documents to
-    # answer this confidently." — which is the correct, honest behavior.
 
-    # ------------------------------------------------------------------
-    # Evidence-aware ranking for tender-fact questions
-    #
-    # IMPORTANT:
-    # A later amendment number does NOT automatically mean that
-    # the amendment changed the requested fact.
-    # ------------------------------------------------------------------
     def default_rank(item: dict[str, Any]) -> float:
         return float(item.get("similarity_score", 0.0))
 
@@ -339,7 +305,6 @@ def retrieve_relevant_context(
     else:
         active_rank = default_rank
 
-    # Remove useless OCR/page-number-only chunks
     filtered_context = []
     for item in retrieved_context:
         text = item.get("text", "").strip()

@@ -3,7 +3,6 @@ from langdetect import DetectorFactory, detect
 
 from app.core.logging import log_action, logger
 
-# Set seed for deterministic language detection
 DetectorFactory.seed = 0
 
 
@@ -13,7 +12,6 @@ def detect_document_language(full_text: str) -> tuple[bool, str]:
     Returns (is_english: bool, detected_lang_code: str).
     """
     if not full_text or len(full_text.strip()) < 20:
-        # Default to English if minimal text
         return True, "en"
 
     try:

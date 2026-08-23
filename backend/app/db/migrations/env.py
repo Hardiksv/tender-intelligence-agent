@@ -5,14 +5,13 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool, text
 
-# Add backend directory to sys.path so app package is resolvable
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 if os.getcwd() not in sys.path:
     sys.path.insert(0, os.getcwd())
 
-import app.db.models  # Ensure models are loaded
+import app.db.models
 from app.core.config import settings
 from app.db.database import Base
 
@@ -50,7 +49,6 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        # Create vector extension if not exists
         connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         connection.commit()
 

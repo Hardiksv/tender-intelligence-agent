@@ -14,7 +14,6 @@ def test_load_rag_prompt():
     assert "{context}" in prompt
 
 def test_rag_zero_hallucination_on_empty_context(monkeypatch):
-    # Mock retrieve_relevant_context to return empty list
     monkeypatch.setattr("app.services.rag.retrieve_relevant_context", lambda **kwargs: [])
     
     mock_db = MagicMock()

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/profile", tags=["Company Profile"])
 
 
 @router.get("", response_model=CompanyProfileResponse)
-async def get_company_profile(db: Session = Depends(get_db)):  # noqa: B008
+async def get_company_profile(db: Session = Depends(get_db)):
     try:
         profile = get_or_create_default_profile(db)
         return CompanyProfileResponse(
@@ -43,7 +43,7 @@ async def get_company_profile(db: Session = Depends(get_db)):  # noqa: B008
 
 
 @router.put("", response_model=CompanyProfileResponse)
-async def update_company_profile(update_data: CompanyProfileUpdate, db: Session = Depends(get_db)):  # noqa: B008
+async def update_company_profile(update_data: CompanyProfileUpdate, db: Session = Depends(get_db)):
     profile = get_or_create_default_profile(db)
 
     if update_data.fleet_size is not None:
@@ -60,7 +60,6 @@ async def update_company_profile(update_data: CompanyProfileUpdate, db: Session 
     db.commit()
     db.refresh(profile)
 
-    # Automatically re-screen all existing tenders against the new profile
     profile_base = CompanyProfileBase(
         fleet_size=profile.fleet_size,
         annual_turnover=float(profile.annual_turnover),

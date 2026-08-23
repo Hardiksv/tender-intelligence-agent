@@ -33,7 +33,6 @@ def test_document_chunk_db_insertion():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        # Create test tender
         t_id = uuid.uuid4()
         t = Tender(
             id=t_id,
@@ -75,7 +74,6 @@ def test_document_chunk_db_insertion():
         db.add(chunk)
         db.commit()
 
-        # Retrieve and verify
         retrieved = db.query(DocumentChunk).filter(DocumentChunk.id == chunk.id).first()
         assert retrieved is not None
         assert len(retrieved.embedding) == 768

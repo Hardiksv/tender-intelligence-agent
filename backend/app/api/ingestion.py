@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/ingestion", tags=["Ingestion"])
 @router.post("/run", response_model=IngestionJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_ingestion_run(
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)  # noqa: B008
+    db: Session = Depends(get_db)
 ):
     """
     Triggers asynchronous background ingestion of seed PDF tender documents.
@@ -52,7 +52,6 @@ async def trigger_ingestion_run(
         import uuid
         job.id = uuid.uuid4()
 
-    # Launch in FastAPI BackgroundTasks
     background_tasks.add_task(run_ingestion_pipeline, str(job.id))
 
     return IngestionJobResponse(
@@ -69,7 +68,7 @@ async def trigger_ingestion_run(
 
 
 @router.get("/{job_id}", response_model=IngestionJobResponse)
-async def get_ingestion_job_status(job_id: str, db: Session = Depends(get_db)):  # noqa: B008
+async def get_ingestion_job_status(job_id: str, db: Session = Depends(get_db)):
     try:
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
     except Exception:

@@ -33,7 +33,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration - Fully allow all Vercel domains and origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,7 +43,6 @@ app.add_middleware(
 )
 
 
-# Exception Handlers
 @app.exception_handler(ConcurrentIngestionException)
 async def concurrent_ingestion_handler(request: Request, exc: ConcurrentIngestionException):
     log_action("INGESTION_REJECTED_CONCURRENT", status="REJECTED", details={"message": exc.message})
@@ -78,14 +76,12 @@ async def tender_agent_exception_handler(request: Request, exc: TenderAgentExcep
     )
 
 
-# Include API Routers
 app.include_router(tenders.router)
 app.include_router(screening.router)
 app.include_router(profile.router)
 app.include_router(chat.router)
 app.include_router(ingestion.router)
 
-# Root-level Route Aliases for assignment compliance and Vercel compatibility
 @app.get("/", tags=["Root"])
 @app.get("/api", tags=["Root"])
 @app.get("/api/", tags=["Root"])
@@ -124,19 +120,19 @@ async def api_openapi():
     return JSONResponse(get_openapi(title=app.title, version=app.version, routes=app.routes))
 
 @app.get("/tenders", tags=["Tenders Alias"])
-async def list_tenders_alias(db = Depends(get_db)):  # noqa: B008
+async def list_tenders_alias(db = Depends(get_db)):
     return await tenders.list_tenders(db=db)
 
 @app.post("/ask", tags=["RAG Alias"])
-async def ask_alias(req: chat.ChatRequest, db = Depends(get_db)):  # noqa: B008
+async def ask_alias(req: chat.ChatRequest, db = Depends(get_db)):
     return await chat.chat_qna(req, db=db)
 
 @app.post("/search", tags=["Search Alias"])
-async def search_alias(req: chat.ChatRequest, db = Depends(get_db)):  # noqa: B008
+async def search_alias(req: chat.ChatRequest, db = Depends(get_db)):
     return await chat.chat_qna(req, db=db)
 
 @app.post("/ingest", tags=["Ingestion Alias"])
-async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):  # noqa: B008
+async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):
     return await ingestion.trigger_ingestion_run(background_tasks, db=db)
 
 
