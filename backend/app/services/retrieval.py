@@ -3,7 +3,8 @@ import re
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import cast, func, literal_column, select
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Session
 
 from app.core.logging import log_action, logger
@@ -148,20 +149,31 @@ def retrieve_relevant_context(
                 is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
 
                 if is_postgres:
-                    # cosine_distance returns a value in [0.0, 2.0] for normalized vectors;
-                    # similarity = 1.0 - cosine_distance gives [−1.0, 1.0], clamped to [0.0, 1.0]
-                    distance_col = DocumentChunk.embedding.cosine_distance(query_vector).label("cos_dist")
+                    # Use raw pgvector <=> operator (cosine distance) via literal_column.
+                    # DocumentChunk.embedding.cosine_distance() is unavailable because the
+                    # column uses a TypeDecorator (VectorType) which loses the pgvector
+                    # comparator. literal_column() creates a proper column expression
+                    # that can be labeled and used in ORDER BY.
+                    vector_str = "[" + ",".join(str(float(v)) for v in query_vector) + "]"
+                    cos_dist_expr = literal_column(
+                        f"document_chunks.embedding <=> '{vector_str}'::vector"
+                    ).label("cos_dist")
 
-                    stmt = select(DocumentChunk, Tender.title, Document.file_name, distance_col).join(
-                        Tender, DocumentChunk.tender_id == Tender.id
-                    ).join(
-                        Document, DocumentChunk.document_id == Document.id
+                    stmt = (
+                        select(
+                            DocumentChunk,
+                            Tender.title,
+                            Document.file_name,
+                            cos_dist_expr
+                        )
+                        .join(Tender, DocumentChunk.tender_id == Tender.id)
+                        .join(Document, DocumentChunk.document_id == Document.id)
                     )
 
                     if tender_id_filter:
                         stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
 
-                    stmt = stmt.order_by(distance_col).limit(top_k)
+                    stmt = stmt.order_by(cos_dist_expr).limit(top_k)
                     results = db.execute(stmt).all()
 
                     for row in results:
