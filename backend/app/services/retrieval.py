@@ -130,117 +130,109 @@ def retrieve_relevant_context(
                 "text": f"Tender Title: '{t.title}', Issuing Authority: '{t.issuing_authority}', State: '{t.state}'. Deadline: {t.submission_deadline.isoformat()} ({days_left} days remaining). EMD: INR {t.emd_amount}.",
                 "similarity_score": 1.0
             })
-    else:
-        query_vector = None
+
+    query_vector = None
+    try:
+        query_vector = generate_embedding(question)
+    except Exception as e:
+        logger.warning(f"Query vector generation failed: {e}. No vector search will run for this query.")
+
+    if query_vector:
         try:
-            query_vector = generate_embedding(question)
+            is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
+            if is_postgres:
+                vector_str = "[" + ",".join(str(float(v)) for v in query_vector) + "]"
+                cos_dist_expr = literal_column(
+                    f"document_chunks.embedding <=> '{vector_str}'::vector"
+                ).label("cos_dist")
+
+                stmt = (
+                    select(
+                        DocumentChunk,
+                        Tender.title,
+                        Document.file_name,
+                        cos_dist_expr
+                    )
+                    .join(Tender, DocumentChunk.tender_id == Tender.id)
+                    .join(Document, DocumentChunk.document_id == Document.id)
+                )
+
+                if tender_id_filter:
+                    stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
+
+                stmt = stmt.order_by(cos_dist_expr).limit(top_k)
+                results = db.execute(stmt).all()
+
+                for row in results:
+                    chunk: DocumentChunk = row[0]
+
+                    if any(
+                        existing["chunk_index"] == chunk.chunk_index
+                        and existing["document_name"] == row[2]
+                        for existing in retrieved_context
+                    ):
+                        continue
+
+                    title: str = row[1]
+                    file_name: str = row[2]
+                    cos_dist: float = float(row[3])
+                    similarity_score = round(max(0.0, 1.0 - cos_dist), 4)
+
+                    retrieved_context.append({
+                        "tender_id": str(chunk.tender_id),
+                        "tender_title": title,
+                        "document_name": file_name,
+                        "page_number": chunk.page_number,
+                        "chunk_index": chunk.chunk_index,
+                        "text": chunk.chunk_text,
+                        "similarity_score": similarity_score
+                    })
+            else:
+                import numpy as np
+                q_arr = np.array(query_vector, dtype=np.float32)
+                q_norm = np.linalg.norm(q_arr)
+
+                stmt = select(DocumentChunk, Tender.title, Document.file_name).join(
+                    Tender, DocumentChunk.tender_id == Tender.id
+                ).join(
+                    Document, DocumentChunk.document_id == Document.id
+                )
+                if tender_id_filter:
+                    stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
+
+                all_chunks = db.execute(stmt).all()
+                scored_rows = []
+                for chunk, title, file_name in all_chunks:
+                    emb = chunk.embedding
+                    if not emb:
+                        continue
+                    if len(emb) != len(query_vector):
+                        continue
+                    c_arr = np.array(emb, dtype=np.float32)
+                    c_norm = np.linalg.norm(c_arr)
+                    if q_norm > 0 and c_norm > 0:
+                        sim = np.dot(q_arr, c_arr) / (q_norm * c_norm)
+                        scored_rows.append((sim, chunk, title, file_name))
+
+                scored_rows.sort(key=lambda x: x[0], reverse=True)
+                for sim, chunk, title, file_name in scored_rows[:top_k]:
+                    if any(
+                        existing["chunk_index"] == chunk.chunk_index
+                        and existing["document_name"] == file_name
+                        for existing in retrieved_context
+                    ):
+                        continue
+                    retrieved_context.append({
+                        "tender_id": str(chunk.tender_id),
+                        "tender_title": title,
+                        "document_name": file_name,
+                        "page_number": chunk.page_number,
+                        "chunk_index": chunk.chunk_index,
+                        "text": chunk.chunk_text,
+                        "similarity_score": round(sim, 4)
+                    })
         except Exception as e:
-            logger.warning(f"Query vector generation failed: {e}. No vector search will run for this query.")
-
-        if query_vector:
-            try:
-                is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
-
-                if is_postgres:
-                    vector_str = "[" + ",".join(str(float(v)) for v in query_vector) + "]"
-                    cos_dist_expr = literal_column(
-                        f"document_chunks.embedding <=> '{vector_str}'::vector"
-                    ).label("cos_dist")
-
-                    stmt = (
-                        select(
-                            DocumentChunk,
-                            Tender.title,
-                            Document.file_name,
-                            cos_dist_expr
-                        )
-                        .join(Tender, DocumentChunk.tender_id == Tender.id)
-                        .join(Document, DocumentChunk.document_id == Document.id)
-                    )
-
-                    if tender_id_filter:
-                        stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
-
-                    stmt = stmt.order_by(cos_dist_expr).limit(top_k)
-                    results = db.execute(stmt).all()
-
-                    for row in results:
-                        chunk: DocumentChunk = row[0]
-
-                        if any(
-                            existing["chunk_index"] == chunk.chunk_index
-                            and existing["document_name"] == row[2]
-                            for existing in retrieved_context
-                        ):
-                            continue
-
-                        title: str = row[1]
-                        file_name: str = row[2]
-                        cos_dist: float = float(row[3])
-                        similarity_score = round(max(0.0, 1.0 - cos_dist), 4)
-
-                        retrieved_context.append({
-                            "tender_id": str(chunk.tender_id),
-                            "tender_title": title,
-                            "document_name": file_name,
-                            "page_number": chunk.page_number,
-                            "chunk_index": chunk.chunk_index,
-                            "text": chunk.chunk_text,
-                            "similarity_score": similarity_score
-                        })
-                else:
-                    import numpy as np
-                    q_arr = np.array(query_vector, dtype=np.float32)
-                    q_norm = np.linalg.norm(q_arr)
-
-                    stmt = select(DocumentChunk, Tender.title, Document.file_name).join(
-                        Tender, DocumentChunk.tender_id == Tender.id
-                    ).join(
-                        Document, DocumentChunk.document_id == Document.id
-                    )
-                    if tender_id_filter:
-                        stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
-
-                    rows = db.execute(stmt).all()
-                    scored_rows = []
-                    for row in rows:
-                        chunk, title, file_name = row[0], row[1], row[2]
-                        emb = chunk.embedding
-                        if isinstance(emb, list):
-                            emb_arr = np.array(emb, dtype=np.float32)
-                            
-                            if len(q_arr) != len(emb_arr):
-                                min_dim = min(len(q_arr), len(emb_arr))
-                                q_compare = q_arr[:min_dim]
-                                emb_compare = emb_arr[:min_dim]
-                                q_compare_norm = np.linalg.norm(q_compare)
-                                denom = q_compare_norm * np.linalg.norm(emb_compare)
-                                sim = float(np.dot(q_compare, emb_compare) / denom) if denom > 0 else 0.0
-                            else:
-                                denom = q_norm * np.linalg.norm(emb_arr)
-                                sim = float(np.dot(q_arr, emb_arr) / denom) if denom > 0 else 0.0
-                                
-                            scored_rows.append((sim, chunk, title, file_name))
-
-                    scored_rows.sort(key=lambda x: x[0], reverse=True)
-                    for sim, chunk, title, file_name in scored_rows[:top_k]:
-                        if any(
-                            existing["chunk_index"] == chunk.chunk_index
-                            and existing["document_name"] == file_name
-                            for existing in retrieved_context
-                        ):
-                            continue
-                        retrieved_context.append({
-                            "tender_id": str(chunk.tender_id),
-                            "tender_title": title,
-                            "document_name": file_name,
-                            "page_number": chunk.page_number,
-                            "chunk_index": chunk.chunk_index,
-                            "text": chunk.chunk_text,
-                            "similarity_score": round(sim, 4)
-                        })
-            except Exception as e:
-                logger.warning(f"Vector search query failed: {e}")
+            logger.warning(f"Vector search query failed: {e}")
 
 
     def default_rank(item: dict[str, Any]) -> float:

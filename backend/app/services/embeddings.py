@@ -43,28 +43,38 @@ def _call_jina_api(texts: list[str], task_type: str = "retrieval.query") -> list
         return []
 
     url = "https://api.jina.ai/v1/embeddings"
-    payload = {
-        "model": settings.EMBEDDING_MODEL if "jina" in settings.EMBEDDING_MODEL else "jina-embeddings-v5-omni-small",
-        "task": task_type,
-        "dimensions": settings.EMBEDDING_DIMENSION,
-        "normalized": True,
-        "input": texts
-    }
-
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent": "Mozilla/5.0"
+    all_embeddings = []
+    
+    # Process in batches of 32 to avoid 422 Payload Too Large
+    batch_size = 32
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i + batch_size]
+        payload = {
+            "model": settings.EMBEDDING_MODEL if "jina" in settings.EMBEDDING_MODEL else "jina-embeddings-v5-omni-small",
+            "task": task_type,
+            "dimensions": settings.EMBEDDING_DIMENSION,
+            "normalized": True,
+            "input": batch_texts
         }
-    )
 
-    with urllib.request.urlopen(req, timeout=15.0) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-        embeddings = [item["embedding"] for item in data.get("data", [])]
-        return embeddings
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        with urllib.request.urlopen(req, timeout=30.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            batch_embeddings = [item["embedding"] for item in data.get("data", [])]
+            all_embeddings.extend(batch_embeddings)
+            import time
+            time.sleep(2)
+            
+    return all_embeddings
 
 
 def generate_embedding(text: str) -> list[float]:
@@ -167,20 +177,23 @@ def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
 
     if not vectors and model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
         try:
-            response = litellm.embedding(
-                model=model_name,
-                input=texts,
-                dimensions=settings.EMBEDDING_DIMENSION,
-                api_key=settings.LLM_API_KEY,
-                timeout=15.0
-            )
-            for item in response.data:
-                raw = item["embedding"]
-                if len(raw) == settings.EMBEDDING_DIMENSION:
-                    vectors.append(raw)
-                else:
-                    multiplier = (settings.EMBEDDING_DIMENSION // len(raw)) + 1
-                    vectors.append((raw * multiplier)[:settings.EMBEDDING_DIMENSION])
+            batch_size = 32
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                response = litellm.embedding(
+                    model=model_name,
+                    input=batch_texts,
+                    dimensions=settings.EMBEDDING_DIMENSION,
+                    api_key=settings.LLM_API_KEY,
+                    timeout=15.0
+                )
+                for item in response.data:
+                    raw = item["embedding"]
+                    if len(raw) == settings.EMBEDDING_DIMENSION:
+                        vectors.append(raw)
+                    else:
+                        multiplier = (settings.EMBEDDING_DIMENSION // len(raw)) + 1
+                        vectors.append((raw * multiplier)[:settings.EMBEDDING_DIMENSION])
         except Exception as e:
             logger.warning(f"Batch cloud embedding failed: {e}. Falling back to local batch generation.")
             errors.append(f"cloud[{model_name}]: {e}")

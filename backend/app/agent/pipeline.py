@@ -88,6 +88,45 @@ CATALOG = {
         "amendment_number": "Amendment No. 3",
         "source_url": "http://www.convergence.co.in/public/upload/tender_pdf/l6hjmz7na83xqvad64.pdf"
     },
+    "cesl_pm_ebus_sewa_3_amend_1.pdf": {
+        "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 1",
+        "source_url": "http://www.convergence.co.in/amend1"
+    },
+    "cesl_pm_ebus_sewa_3_amend_2.pdf": {
+        "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 2",
+        "source_url": "http://www.convergence.co.in/amend2"
+    },
+    "cesl_pm_ebus_sewa_3_amend_4.pdf": {
+        "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 4",
+        "latest_deadline_source": "Amendment No. 4",
+        "source_url": "http://www.convergence.co.in/amend4"
+    },
+    "jctsl_jaipur_rfp.pdf": {
+        "tender_ref": "NIB No. 11/2025-26",
+        "is_parent": True,
+        "document_type": "ORIGINAL_RFP",
+        "amendment_number": None,
+        "title": "Selection of Bus Operator for Procurement, Supply, Operation and Maintenance of 50 Fully Built Pure Electric Double Decker AC Buses on Gross Cost Contracting (GCC)",
+        "issuing_authority": "JCTSL",
+        "city": "Jaipur",
+        "state": "Rajasthan",
+        "original_bus_quantity": 50,
+        "latest_bus_quantity": 50,
+        "latest_quantity_source": "Original RFP",
+        "submission_deadline": "2026-09-22T18:00:00+05:30",
+        "emd_amount": 5000000.0,
+        "document_fee": 5000.0,
+        "source_url": "https://transport.rajasthan.gov.in/jctsl"
+    },
     "cesl_pm_edrive_6230_electric_buses_gcc.pdf": {
         "tender_ref": "CESL/06/2025-26/PM E-Drive/252601015",
         "is_parent": True,

@@ -23,6 +23,21 @@ from app.db.database import get_db
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown."""
     logger.info("Tender Intelligence API started.")
+    try:
+        import os
+        from app.db.database import SessionLocal
+        from app.db.models import Tender, Document
+        db = SessionLocal()
+        tender_count = db.query(Tender).count()
+        doc_count = db.query(Document).count()
+        
+        data_raw_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "raw")
+        source_docs = len([f for f in os.listdir(data_raw_dir) if f.endswith(".pdf")]) if os.path.exists(data_raw_dir) else 0
+        
+        logger.info(f"STARTUP DB HEALTH CHECK: {tender_count} Tenders, {doc_count} DB Documents, {source_docs} Source PDFs in data/raw/")
+        db.close()
+    except Exception as e:
+        logger.error(f"STARTUP DB HEALTH CHECK FAILED: {e}")
     yield
     logger.info("Tender Intelligence API stopped.")
 

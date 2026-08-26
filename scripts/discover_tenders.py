@@ -39,24 +39,63 @@ class TenderSource(ABC):
         pass
 
 
-class CPPPTenderSource(TenderSource):
+class CESLTenderSource(TenderSource):
     """
-    CPPP (Central Public Procurement Portal) Discovery Adapter.
-    Uses public search API endpoint with polite request delays.
+    CESL (Convergence Energy Services Limited) Discovery Adapter.
+    Politely scrapes the public tender listing page.
     """
-    source_name = "CPPP eprocure.gov.in"
-    base_url = "https://eprocure.gov.in"
+    source_name = "CESL Convergence"
+    base_url = "https://www.convergence.co.in/tender"
 
     def discover(self) -> list[dict]:
         log_action("DISCOVERY_STARTED", status="RUNNING", details={"source": self.source_name})
         candidates = []
 
         try:
-            # Polite delay before any portal request
             time.sleep(POLITENESS_DELAY_SECONDS)
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
+            response = requests.get(self.base_url, timeout=30, verify=False, headers={
+                "User-Agent": "TenderIntelligenceAgent/1.0 (Research Bot; Contact: admin@example.com)"
+            })
+            response.raise_for_status()
 
-            # In production: real CPPP API / scraping call here.
-            # For now: return empty list to avoid unauthorized scraping in demo.
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Find the main tender table
+            table = soup.find('table', class_='tableBorder')
+            if not table:
+                logger.warning(f"[Discovery] {self.source_name}: Could not find tender table.")
+                return []
+
+            rows = table.find_all('tr')[1:]  # Skip header row
+            for row in rows:
+                cols = row.find_all('td')
+                if len(cols) >= 6:
+                    desc_td = cols[1]
+                    link_tag = desc_td.find('a')
+                    if not link_tag or not link_tag.get('href'):
+                        continue
+                        
+                    title = link_tag.text.strip()
+                    doc_url = link_tag['href']
+                    if not doc_url.startswith('http'):
+                        doc_url = "https://www.convergence.co.in" + doc_url
+
+                    nit_number = cols[2].text.strip()
+                    sale_end = cols[5].text.strip()
+
+                    candidates.append({
+                        "title": title,
+                        "tender_ref": nit_number,
+                        "document_url": doc_url,
+                        "sale_end_date": sale_end,
+                        "source_url": doc_url,
+                        "file_name": doc_url.split('/')[-1]
+                    })
+
             logger.info(f"[Discovery] {self.source_name}: Discovery scan complete. Found {len(candidates)} candidates.")
             log_action("DISCOVERY_COMPLETED", status="SUCCESS", details={
                 "source": self.source_name,
@@ -72,15 +111,18 @@ class CPPPTenderSource(TenderSource):
         if not url:
             return None
 
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 time.sleep(POLITENESS_DELAY_SECONDS)
-                response = requests.get(url, timeout=30, headers={
+                response = requests.get(url, timeout=30, verify=False, headers={
                     "User-Agent": "TenderIntelligenceAgent/1.0 (Research Bot; Contact: admin@example.com)"
                 })
                 if response.status_code == 200:
                     return response.content
-                logger.warning(f"[Discovery] Fetch attempt {attempt}/{MAX_RETRIES} returned HTTP {response.status_code}")
+                logger.warning(f"[Discovery] Fetch attempt {attempt}/{MAX_RETRIES} returned HTTP {response.status_code} for {url}")
             except requests.RequestException as e:
                 logger.warning(f"[Discovery] Fetch attempt {attempt}/{MAX_RETRIES} failed: {e}")
 
@@ -183,7 +225,7 @@ def start_discovery_scheduler(interval_minutes: int = 60):
     data_raw_dir = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "data", "raw"
     )
-    sources = [CPPPTenderSource()]
+    sources = [CESLTenderSource()]
 
     def scheduler_loop():
         while True:

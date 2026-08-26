@@ -66,9 +66,7 @@ class LiteLLMClient(AbstractLLMClient):
         models_to_try = [
             self.primary_model,
             self.fallback_model,
-            "groq/openai/gpt-oss-120b",
-            "groq/qwen/qwen3.6-27b",
-            "groq/openai/gpt-oss-20b"
+            "groq/qwen/qwen3.6-27b"
         ]
         models_to_try = list(dict.fromkeys(models_to_try))
         last_error = None
@@ -83,6 +81,8 @@ class LiteLLMClient(AbstractLLMClient):
                     api_key=self.api_key if (self.api_key and self.api_key != "mock_key_for_testing") else None
                 )
                 content = response.choices[0].message.content
+                if "<think" in content and "</think>" not in content:
+                    raise RuntimeError("Model output was truncated mid-reasoning (missing </think> tag).")
                 if "</think>" in content:
                     content = content.split("</think>")[-1].strip()
                 usage = self._extract_usage(response, model, "completion")
@@ -128,7 +128,7 @@ class LiteLLMClient(AbstractLLMClient):
                 os.environ["GEMINI_API_KEY"] = settings.LLM_API_KEY
                 os.environ["GOOGLE_API_KEY"] = settings.LLM_API_KEY
 
-        models_to_try = [self.primary_model, self.fallback_model, "groq/openai/gpt-oss-120b", "groq/qwen/qwen3.6-27b"]
+        models_to_try = [self.primary_model, self.fallback_model, "groq/qwen/qwen3.6-27b"]
         models_to_try = list(dict.fromkeys(models_to_try))
         last_error = None
 
@@ -142,6 +142,8 @@ class LiteLLMClient(AbstractLLMClient):
                     api_key=self.api_key if self.api_key != "mock_key_for_testing" else None
                 )
                 raw_text = response.choices[0].message.content
+                if "<think" in raw_text and "</think>" not in raw_text:
+                    raise RuntimeError("Model output was truncated mid-reasoning (missing </think> tag).")
                 if "</think>" in raw_text:
                     raw_text = raw_text.split("</think>")[-1].strip()
                 parsed_json = json.loads(raw_text)
