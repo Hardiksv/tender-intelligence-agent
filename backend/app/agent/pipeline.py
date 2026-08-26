@@ -314,7 +314,7 @@ CATALOG = {
 }
 
 
-def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = None):
+def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = None, custom_meta: dict | None = None):
     db = SessionLocal()
     job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
 
@@ -330,7 +330,10 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
 
         log_action("INGESTION_STARTED", job_id=job_id, status="RUNNING")
 
-        pdf_files = glob.glob(os.path.join(SEED_DATA_DIR, "*.pdf"))
+        pdf_files = custom_pdf_paths if custom_pdf_paths else []
+        if not custom_pdf_paths:
+            pdf_files = glob.glob(os.path.join(SEED_DATA_DIR, "*.pdf"))
+        
         job.total_documents = len(pdf_files)
         db.commit()
 
@@ -339,7 +342,13 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
             job.current_document = file_name
             db.commit()
 
-            meta = CATALOG.get(file_name)
+            meta = None
+            if custom_meta and file_name in custom_meta:
+                meta = custom_meta[file_name]
+            
+            if not meta:
+                meta = CATALOG.get(file_name)
+
             if not meta:
                 logger.warning(f"File {file_name} not in catalog. Skipping.")
                 job.failed_documents += 1

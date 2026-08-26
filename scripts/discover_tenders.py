@@ -154,27 +154,43 @@ def run_discovery_cycle(sources: list[TenderSource], data_raw_dir: str):
     """
     Executes one full discovery cycle:
     1. Discover candidates from each source
-    2. Deduplicate against existing documents
-    3. Download new PDFs to data/raw/
+    2. Deduplicate against existing documents in DB
+    3. Download new PDFs to a temporary location
     4. Trigger ingestion pipeline for each new document
     """
     if not settings.DISCOVERY_ENABLED:
         logger.info("[Discovery] Kill switch active (DISCOVERY_ENABLED=false). Skipping run.")
         return
 
-    # Load existing document hashes for deduplication
-    existing_hashes: set[str] = set()
-    if os.path.exists(data_raw_dir):
-        for fname in os.listdir(data_raw_dir):
-            if fname.endswith(".pdf"):
-                fpath = os.path.join(data_raw_dir, fname)
-                with open(fpath, "rb") as f:
-                    existing_hashes.add(compute_document_hash(f.read()))
+    # Load existing document hashes and URLs from DB for deduplication
+    from app.db.database import SessionLocal
+    from app.db.models import Document, IngestionJob, IngestionStatusEnum
+    from app.agent.pipeline import run_ingestion_pipeline
+    import tempfile
+
+    existing_hashes = set()
+    existing_urls = set()
+    
+    try:
+        db = SessionLocal()
+        docs = db.query(Document).all()
+        for d in docs:
+            if d.document_hash:
+                existing_hashes.add(d.document_hash)
+            if d.source_url:
+                existing_urls.add(d.source_url)
+    except Exception as e:
+        logger.error(f"[Discovery] Failed to load existing hashes from DB: {e}")
+    finally:
+        if 'db' in locals():
+            db.close()
 
     for source in sources:
         try:
             candidates = source.discover()
-            unique_candidates = deduplicate_candidates(candidates, existing_hashes)
+            
+            # Deduplicate against DB urls and hashes
+            unique_candidates = deduplicate_candidates(candidates, existing_urls)
 
             for candidate in unique_candidates:
                 content = source.fetch_document(candidate)
@@ -183,17 +199,21 @@ def run_discovery_cycle(sources: list[TenderSource], data_raw_dir: str):
 
                 doc_hash = compute_document_hash(content)
                 if doc_hash in existing_hashes:
-                    logger.info("[Discovery] Skipping already-downloaded document (hash match).")
+                    logger.info("[Discovery] Skipping already-downloaded document (hash match in DB).")
                     continue
 
-                # Save PDF to data/raw
+                # Save PDF to temporary file (Vercel-safe)
                 file_name = candidate.get("file_name", f"discovered_{doc_hash[:12]}.pdf")
-                save_path = os.path.join(data_raw_dir, file_name)
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="tender_")
+                save_path = temp_file.name
                 with open(save_path, "wb") as f:
                     f.write(content)
+                    
                 existing_hashes.add(doc_hash)
+                if candidate.get("document_url"):
+                    existing_urls.add(candidate.get("document_url"))
 
-                logger.info(f"[Discovery] New tender saved: {file_name}")
+                logger.info(f"[Discovery] New tender saved temporarily at: {save_path}")
                 log_action("DISCOVERY_COMPLETED", status="NEW_DOCUMENT", details={
                     "file_name": file_name,
                     "source": source.source_name,
@@ -201,17 +221,37 @@ def run_discovery_cycle(sources: list[TenderSource], data_raw_dir: str):
                 })
 
                 # Reuse existing ingestion pipeline
-                from app.agent.pipeline import run_ingestion_pipeline
-                from app.db.models import IngestionJob, IngestionStatusEnum
-                from app.db.database import SessionLocal
-
                 db = SessionLocal()
                 job = IngestionJob(status=IngestionStatusEnum.PENDING)
                 db.add(job)
                 db.commit()
                 db.refresh(job)
                 db.close()
-                run_ingestion_pipeline(str(job.id), custom_pdf_paths=[save_path])
+                
+                # Parse date or use a future default if extraction fails
+                sale_end = candidate.get("sale_end_date")
+                from datetime import datetime, timezone, timedelta
+                try:
+                    if sale_end:
+                        parsed_date = datetime.strptime(sale_end, "%d-%b-%Y %H:%M %p").isoformat()
+                    else:
+                        parsed_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+                except Exception:
+                    parsed_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+                
+                custom_meta = {
+                    file_name: {
+                        "tender_ref": candidate.get("tender_ref") or doc_hash[:10],
+                        "is_parent": True,
+                        "document_type": "ORIGINAL_RFP",
+                        "title": candidate.get("title", "Discovered Tender"),
+                        "issuing_authority": source.source_name,
+                        "submission_deadline": parsed_date,
+                        "source_url": candidate.get("document_url", "")
+                    }
+                }
+                
+                run_ingestion_pipeline(str(job.id), custom_pdf_paths=[save_path], custom_meta=custom_meta)
 
         except Exception as e:
             logger.error(f"[Discovery] Source {source.source_name} cycle failed: {e}")
