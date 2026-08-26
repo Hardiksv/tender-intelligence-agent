@@ -49,7 +49,7 @@ class LiteLLMClient(AbstractLLMClient):
         prompt: str,
         system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: int = 2000
+        max_tokens: int = 3000
     ) -> dict[str, Any]:
         messages = []
         if system_prompt:
@@ -112,7 +112,8 @@ class LiteLLMClient(AbstractLLMClient):
         prompt: str,
         response_model: type[T],
         system_prompt: str | None = None,
-        temperature: float = 0.0
+        temperature: float = 0.0,
+        max_tokens: int = 3000
     ) -> dict[str, Any]:
         messages = []
         if system_prompt:
@@ -138,6 +139,7 @@ class LiteLLMClient(AbstractLLMClient):
                     model=model,
                     messages=messages,
                     temperature=temperature,
+                    max_tokens=max_tokens,
                     response_format={"type": "json_object"},
                     api_key=self.api_key if self.api_key != "mock_key_for_testing" else None
                 )

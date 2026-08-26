@@ -75,3 +75,24 @@ def test_all_mandatory_pass_plus_review_gives_review(base_profile):
     )
     result = screen_tender_eligibility("test-004", "Sample Tender", "Punjab", eligibility, base_profile)
     assert result.verdict == FinalVerdict.REVIEW
+
+
+def test_boilerplate_requirements_allow_go(base_profile):
+    """
+    BUG 1 FIX TEST: Ensure standard boilerplate requirements like GST or PAN
+    do not force a REVIEW verdict and allow a GO verdict.
+    """
+    eligibility = TenderEligibilitySchema(
+        minimum_fleet_size=100,
+        minimum_annual_turnover=120000000.0,
+        minimum_experience_years=5,
+        minimum_past_contract_value=60000000.0,
+        required_geographies=["Rajasthan"],
+        other_requirements=[
+            OtherRequirementItem(requirement_text="Must possess valid GST registration", is_mandatory=True),
+            OtherRequirementItem(requirement_text="Need PAN card", is_mandatory=True),
+            OtherRequirementItem(requirement_text="Nice to have ISO 9001", is_mandatory=False)
+        ]
+    )
+    result = screen_tender_eligibility("test-005", "Boilerplate Tender", "Rajasthan", eligibility, base_profile)
+    assert result.verdict == FinalVerdict.GO

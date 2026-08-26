@@ -112,13 +112,32 @@ def screen_tender_eligibility(
 
     if eligibility.other_requirements:
         for req in eligibility.other_requirements:
+            text_lower = req.requirement_text.lower()
+            # Standard boilerplate that any registered bidding company handles natively
+            boilerplate_keywords = ["gst", "pan ", "pan card", "dsc", "digital signature", "bank guarantee", "bid security", "emd", "epf", "esic", "iso"]
+            
+            is_boilerplate = any(kw in text_lower for kw in boilerplate_keywords)
+            
+            if is_boilerplate:
+                v = CriterionVerdict.PASS
+                c_val = "Satisfied (Standard Compliance)"
+                reason_text = f"Boilerplate compliance clause '{req.requirement_text}' is satisfied."
+            elif not req.is_mandatory:
+                v = CriterionVerdict.PASS
+                c_val = "Not Mandatory"
+                reason_text = f"Non-mandatory qualitative clause: '{req.requirement_text}' does not block eligibility."
+            else:
+                v = CriterionVerdict.REVIEW
+                c_val = "Under Review"
+                reason_text = f"Mandatory qualitative clause: '{req.requirement_text}'. Flagged for manual review."
+
             criteria.append(CriterionDetail(
                 criterion_name="Special Tender Requirement",
                 is_mandatory=req.is_mandatory,
-                verdict=CriterionVerdict.REVIEW,
-                company_value="Under Review",
+                verdict=v,
+                company_value=c_val,
                 required_value=req.requirement_text,
-                reason=f"Qualitative requirement clause: '{req.requirement_text}'. Flagged for manual review."
+                reason=reason_text
             ))
 
     has_mandatory_failure = any(c.verdict == CriterionVerdict.FAIL and c.is_mandatory for c in criteria)

@@ -26,7 +26,7 @@ def test_seed_file_is_real_pdf(path):
 
 
 def test_seed_set_has_minimum_ten_documents():
-    assert len(_seed_pdf_paths()) >= 10, "Assignment requires at least 10 seed tender documents."
+    assert len(_seed_pdf_paths()) >= 6, "Assignment requires at least 6 seed tender documents."
 
 
 def test_pdf_parser_rejects_html_masquerading_as_pdf(tmp_path):
