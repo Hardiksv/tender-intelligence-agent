@@ -107,6 +107,7 @@ CATALOG = {
         "is_parent": False,
         "document_type": "AMENDMENT",
         "amendment_number": "Amendment No. 4",
+        "latest_submission_deadline": "2026-09-11T16:00:00+05:30",
         "latest_deadline_source": "Amendment No. 4",
         "source_url": "http://www.convergence.co.in/amend4"
     },
@@ -405,28 +406,31 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                     db.flush()
                     logger.info(f"Created Parent Tender Opportunity: {tender_ref}")
                 else:
-                    parent_meta = meta if meta["is_parent"] else next((m for m in CATALOG.values() if m.get("tender_ref") == tender_ref and m.get("is_parent")), meta)
-                    deadline_dt = datetime.fromisoformat(parent_meta["submission_deadline"])
-                    tender.submission_deadline = deadline_dt
-                    tender.original_deadline = deadline_dt
-                    tender.latest_deadline = deadline_dt
-                    tender.latest_deadline_source = parent_meta.get("latest_deadline_source")
-                    tender.emd_amount = parent_meta.get("emd_amount")
-                    tender.original_emd_amount = parent_meta.get("emd_amount")
-                    tender.latest_emd_amount = parent_meta.get("emd_amount")
-                    tender.emd_breakdown = parent_meta.get("emd_breakdown")
-                    if not tender.extraction_provenance:
-                        tender.extraction_provenance = {}
-                    tender.extraction_provenance["emd_amount"] = {
-                        "value": parent_meta.get("emd_amount"),
-                        "breakdown": parent_meta.get("emd_breakdown"),
-                        "source_document": file_name,
-                        "page_number": 1
-                    }
+                    if meta["is_parent"]:
+                        parent_meta = meta
+                        deadline_dt = datetime.fromisoformat(parent_meta["submission_deadline"])
+                        tender.submission_deadline = deadline_dt
+                        tender.original_deadline = deadline_dt
+                        tender.latest_deadline = deadline_dt
+                        tender.latest_deadline_source = parent_meta.get("latest_deadline_source")
+                        tender.emd_amount = parent_meta.get("emd_amount")
+                        tender.original_emd_amount = parent_meta.get("emd_amount")
+                        tender.latest_emd_amount = parent_meta.get("emd_amount")
+                        tender.emd_breakdown = parent_meta.get("emd_breakdown")
+                        if not tender.extraction_provenance:
+                            tender.extraction_provenance = {}
+                        tender.extraction_provenance["emd_amount"] = {
+                            "value": parent_meta.get("emd_amount"),
+                            "breakdown": parent_meta.get("emd_breakdown"),
+                            "source_document": file_name,
+                            "page_number": 1
+                        }
 
                     if "latest_bus_quantity" in meta and not meta["is_parent"]:
                         tender.latest_bus_quantity = meta["latest_bus_quantity"]
                         tender.latest_quantity_source = meta.get("latest_quantity_source", meta.get("amendment_number"))
+                        if not tender.extraction_provenance:
+                            tender.extraction_provenance = {}
                         tender.extraction_provenance["bus_quantity"] = {
                             "original_value": tender.original_bus_quantity,
                             "latest_value": meta["latest_bus_quantity"],
@@ -436,6 +440,14 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                         }
                         db.flush()
                         logger.info(f"Updated Parent Tender {tender_ref} with latest quantity {meta['latest_bus_quantity']} from {file_name}")
+
+                    if "latest_submission_deadline" in meta and not meta["is_parent"]:
+                        deadline_dt = datetime.fromisoformat(meta["latest_submission_deadline"])
+                        tender.submission_deadline = deadline_dt
+                        tender.latest_deadline = deadline_dt
+                        tender.latest_deadline_source = meta.get("latest_deadline_source", meta.get("amendment_number"))
+                        db.flush()
+                        logger.info(f"Updated Parent Tender {tender_ref} with latest deadline {deadline_dt} from {file_name}")
 
                 existing_doc = db.query(Document).filter(Document.document_hash == parsed_doc["document_hash"]).first()
                 if existing_doc:

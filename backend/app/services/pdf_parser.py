@@ -47,8 +47,8 @@ def parse_pdf_document(file_path: str) -> dict[str, Any]:
             page = doc.load_page(page_idx)
             page_text = page.get_text("text") or ""
             
-            # OCR fallback for scanned pages (currently explicitly enabled for JCTSL mock)
-            if len(page_text.strip()) < 50 and "jctsl" in file_path.lower() and page_idx < 15:
+            # OCR fallback for scanned pages
+            if len(page_text.strip()) < 50 and page_idx < 15:
                 logger.info(f"Page {page_idx + 1} has very little text. Attempting OCR...")
                 try:
                     import easyocr
