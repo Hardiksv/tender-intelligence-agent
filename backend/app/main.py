@@ -150,6 +150,22 @@ async def search_alias(req: chat.ChatRequest, db = Depends(get_db)):
 async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):
     return await ingestion.trigger_ingestion_run(background_tasks, db=db)
 
+@app.post("/api/discover", tags=["Discovery"])
+async def trigger_discovery_api():
+    """Trigger the tender discovery cycle manually (synchronous for serverless)."""
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    from scripts.discover_tenders import run_discovery_cycle, CESLTenderSource
+    
+    try:
+        sources = [CESLTenderSource()]
+        data_raw_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "raw")
+        run_discovery_cycle(sources, data_raw_dir)
+        return {"status": "success", "message": "Discovery cycle completed"}
+    except Exception as e:
+        logger.error(f"Discovery API failed: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 @app.get("/api/debug-routing", tags=["Debug"])
 async def debug_routing(request: Request):
