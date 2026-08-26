@@ -113,16 +113,39 @@ def screen_tender_eligibility(
     if eligibility.other_requirements:
         for req in eligibility.other_requirements:
             text_lower = req.requirement_text.lower()
-            # Standard boilerplate that any registered bidding company handles natively
-            boilerplate_keywords = ["gst", "pan ", "pan card", "dsc", "digital signature", "bank guarantee", "bid security", "emd", "epf", "esic", "iso"]
-            
+
+            # Detection: is this the heuristic-fallback sentinel string (not a real requirement)?
+            is_extraction_sentinel = (
+                "automated extraction failed" in text_lower
+                or "verify this tender manually" in text_lower
+                or "eligibility figures above are only" in text_lower
+            )
+
+            # Standard boilerplate that any registered bidding company holds natively.
+            # These are NOT differentiators — every legitimate bidder has GST, PAN, DSC, etc.
+            boilerplate_keywords = [
+                "gst", "pan ", "pan card", "dsc", "digital signature",
+                "bank guarantee", "bid security", "emd", "epf", "esic", "iso",
+                "bid bond", "earnest money", "registration certificate",
+                "income tax", "income-tax",
+            ]
             is_boilerplate = any(kw in text_lower for kw in boilerplate_keywords)
-            
-            if is_boilerplate:
+
+            if is_extraction_sentinel:
+                # Flag extraction failures as REVIEW — but using a clear name so the UI shows WHY
+                v = CriterionVerdict.REVIEW
+                c_val = "Extraction Warning"
+                reason_text = (
+                    "LLM extraction fell back to regex heuristics for this document. "
+                    "Hard criteria (fleet, turnover, experience) may be incomplete — "
+                    "manual verification recommended before bid submission."
+                )
+            elif is_boilerplate:
                 v = CriterionVerdict.PASS
                 c_val = "Satisfied (Standard Compliance)"
                 reason_text = f"Boilerplate compliance clause '{req.requirement_text}' is satisfied."
             elif not req.is_mandatory:
+
                 v = CriterionVerdict.PASS
                 c_val = "Not Mandatory"
                 reason_text = f"Non-mandatory qualitative clause: '{req.requirement_text}' does not block eligibility."
