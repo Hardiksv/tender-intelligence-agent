@@ -64,11 +64,29 @@ def parse_pdf_document(file_path: str) -> dict[str, Any]:
                         import cv2
                         img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2RGB)
                         
-                    ocr_result = reader.readtext(img_array, detail=0)
-                    page_text = " ".join(ocr_result)
-                    logger.info(f"OCR extracted {len(page_text)} chars from page {page_idx + 1}")
-                except Exception as e:
-                    logger.warning(f"OCR failed for page {page_idx + 1}: {e}")
+                    result = reader.readtext(img_array, detail=0)
+                    ocr_text = " ".join(result)
+                    page_text += "\n" + ocr_text
+                    logger.info(f"OCR extracted {len(ocr_text)} chars from page {page_idx + 1}")
+                except ImportError:
+                    logger.info(f"EasyOCR not installed (Vercel limits). Falling back to Cloud OCR API for page {page_idx + 1}...")
+                    import requests
+                    pix = page.get_pixmap()
+                    img_bytes = pix.tobytes("png")
+                    res = requests.post(
+                        'https://api.ocr.space/parse/image',
+                        data={'apikey': 'helloworld', 'language': 'eng', 'scale': 'true'},
+                        files={'file': ('page.png', img_bytes)},
+                        timeout=15
+                    )
+                    if res.status_code == 200:
+                        parsed = res.json()
+                        if not parsed.get("IsErroredOnProcessing"):
+                            ocr_text = " ".join([r.get("ParsedText", "") for r in parsed.get("ParsedResults", [])])
+                            page_text += "\n" + ocr_text
+                            logger.info(f"Cloud OCR extracted {len(ocr_text)} chars from page {page_idx + 1}")
+                except Exception as ocr_err:
+                    logger.warning(f"OCR failed for page {page_idx + 1}: {ocr_err}")
 
             page_number = page_idx + 1
 
