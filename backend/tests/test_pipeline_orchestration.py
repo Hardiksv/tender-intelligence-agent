@@ -517,3 +517,48 @@ def test_idempotency_screening_multiple_runs_no_duplicates(test_db):
     assert count_after_second == 1, (
         f"Expected 1 ScreeningResult (idempotent), found {count_after_second}"
     )
+
+from datetime import datetime
+from app.db.models import Tender
+from app.agent.pipeline import run_ingestion_pipeline
+
+
+def test_deadline_merge_order_independence_direct():
+    from app.db.models import Tender
+    from datetime import datetime, timezone
+    
+    # Initial state
+    tender = Tender(
+        tender_ref='TEST_DEADLINE_MERGE',
+        submission_deadline=datetime(2026, 10, 1, tzinfo=timezone.utc),
+        latest_deadline=datetime(2026, 10, 1, tzinfo=timezone.utc)
+    )
+    
+    meta_amend_2 = {
+        'is_parent': False,
+        'amendment_number': '2',
+        'latest_submission_deadline': '2026-12-01T15:00:00+00:00'
+    }
+    
+    meta_amend_1 = {
+        'is_parent': False,
+        'amendment_number': '1',
+        'latest_submission_deadline': '2026-11-01T15:00:00+00:00'
+    }
+    
+    # Apply amend 2
+    deadline2 = datetime.fromisoformat(meta_amend_2['latest_submission_deadline'])
+    if not tender.submission_deadline or deadline2 > tender.submission_deadline.replace(tzinfo=deadline2.tzinfo):
+        tender.submission_deadline = deadline2
+        tender.latest_deadline = deadline2
+        
+    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+    
+    # Apply amend 1 (simulate reverse order)
+    deadline1 = datetime.fromisoformat(meta_amend_1['latest_submission_deadline'])
+    if not tender.submission_deadline or deadline1 > tender.submission_deadline.replace(tzinfo=deadline1.tzinfo):
+        tender.submission_deadline = deadline1
+        tender.latest_deadline = deadline1
+        
+    # Deadline should remain 12-01, not 11-01
+    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')

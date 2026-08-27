@@ -147,7 +147,7 @@ docker compose down
 ## 6. Seed Data Ingestion & Integrity Verification
 
 ### 6.1 Seed Corpus Validation `[VERIFIED]`
-Run the standalone validation script to verify that all 17 PDF documents in `data/raw/` are authentic binary PDFs (checking `%PDF-` magic header):
+Run the standalone validation script to verify that all 15 PDF documents in `data/raw/` are authentic binary PDFs (checking `%PDF-` magic header):
 
 **Windows CMD / PowerShell / Linux:**
 ```bash
@@ -163,7 +163,7 @@ Tender Document Seed Integrity Verification
   [PASS] cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf (4,036,054 bytes)
   [PASS] cesl_pm_edrive_6230_electric_buses_gcc.pdf (10,616,140 bytes)
   ...
-All 17 files in data/raw/ are verified genuine PDFs.
+All 15 files in data/raw/ are verified genuine PDFs.
 ```
 
 ---
@@ -215,8 +215,8 @@ Expected Response (`200 OK` upon completion):
 {
   "job_id": "<job_id>",
   "status": "COMPLETED",
-  "total_documents": 17,
-  "completed_documents": 17,
+  "total_documents": 15,
+  "completed_documents": 15,
   "failed_documents": 0,
   "current_document": null,
   "started_at": "2026-08-20T13:30:01.000Z",
@@ -526,7 +526,7 @@ python scripts/e2e_playwright_test.py
 
 | Feature / Subsystem | Status Tag | Operational Notes |
 |---|---|---|
-| **17 PDF Document Ingestion Pipeline** | `[VERIFIED]` | PyMuPDF with `%PDF-` magic-byte validation. |
+| **15 PDF Document Ingestion Pipeline** | `[VERIFIED]` | PyMuPDF with `%PDF-` magic-byte validation. (Synthetic documents explicitly removed). |
 | **Pydantic Structured Extraction** | `[VERIFIED]` | Extracts dates, EMD breakdowns, fleet sizes, turnover. |
 | **Deterministic Screening Engine** | `[VERIFIED]` | Enforces strict precedence ($NO\text{-}GO > REVIEW > GO$). |
 | **Hybrid SQL + Vector Retrieval** | `[VERIFIED]` | SQL temporal routing + 768d dense vector search. |
@@ -534,5 +534,5 @@ python scripts/e2e_playwright_test.py
 | **Dual PostgreSQL / SQLite Engine** | `[VERIFIED]` | Automatic fallback when PostgreSQL is offline. |
 | **FastAPI REST Endpoints** | `[VERIFIED]` | All 10 routes tested and operational. |
 | **FastMCP Server** | `[VERIFIED]` | 3 tools registered and operable over stdio. |
-| **Automated Scraper (`discover_tenders.py`)** | `[OPTIONAL / SKELETON]` | Scraper adapter skeleton with polite delays. |
+| **Automated Scraper (`discover_tenders.py`)** | `[VERIFIED]` | Scraper adapter with polite delays, Discord Webhook alerts, and Vercel Cron (`vercel.json`) integration. |
 | **User Authentication / RBAC** | `[NOT IMPLEMENTED]` | Open REST API without JWT authentication. |

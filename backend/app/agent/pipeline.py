@@ -452,11 +452,15 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
 
                     if "latest_submission_deadline" in meta and not meta["is_parent"]:
                         deadline_dt = datetime.fromisoformat(meta["latest_submission_deadline"])
-                        tender.submission_deadline = deadline_dt
-                        tender.latest_deadline = deadline_dt
-                        tender.latest_deadline_source = meta.get("latest_deadline_source", meta.get("amendment_number"))
-                        db.flush()
-                        logger.info(f"Updated Parent Tender {tender_ref} with latest deadline {deadline_dt} from {file_name}")
+                        # Make deadline-merge order-independent: only update if the new date is strictly later
+                        if not tender.submission_deadline or deadline_dt > tender.submission_deadline.replace(tzinfo=deadline_dt.tzinfo):
+                            tender.submission_deadline = deadline_dt
+                            tender.latest_deadline = deadline_dt
+                            tender.latest_deadline_source = meta.get("latest_deadline_source", meta.get("amendment_number"))
+                            db.flush()
+                            logger.info(f"Updated Parent Tender {tender_ref} with latest deadline {deadline_dt} from {file_name}")
+                        else:
+                            logger.info(f"Ignored earlier deadline {deadline_dt} from {file_name} (current is {tender.submission_deadline})")
 
                 existing_doc = db.query(Document).filter(Document.document_hash == parsed_doc["document_hash"]).first()
                 if existing_doc:

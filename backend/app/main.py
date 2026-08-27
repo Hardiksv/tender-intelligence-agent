@@ -36,6 +36,13 @@ async def lifespan(app: FastAPI):
         
         logger.info(f"STARTUP DB HEALTH CHECK: {tender_count} Tenders, {doc_count} DB Documents, {source_docs} Source PDFs in data/raw/")
         db.close()
+        
+        from app.core.config import settings
+        if settings.DISCOVERY_ENABLED:
+            logger.info("Starting background tender discovery scheduler...")
+            from scripts.discover_tenders import start_discovery_scheduler
+            start_discovery_scheduler(interval_minutes=60)
+            
     except Exception as e:
         logger.error(f"STARTUP DB HEALTH CHECK FAILED: {e}")
     yield

@@ -219,6 +219,15 @@ def run_discovery_cycle(sources: list[TenderSource], data_raw_dir: str):
                     "source": source.source_name,
                     "document_hash": doc_hash[:12]
                 })
+                
+                webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
+                if webhook_url:
+                    try:
+                        requests.post(webhook_url, json={
+                            "content": f"🚨 **New Tender Discovered!** 🚨\n**Source:** {source.source_name}\n**File:** {file_name}\n**Link:** {candidate.get('document_url', 'N/A')}\nStarting automated ingestion pipeline..."
+                        }, timeout=5)
+                    except Exception as e:
+                        logger.error(f"[Discovery] Failed to send Discord webhook: {e}")
 
                 # Reuse existing ingestion pipeline
                 db = SessionLocal()
