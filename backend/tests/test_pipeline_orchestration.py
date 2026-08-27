@@ -523,7 +523,103 @@ from app.db.models import Tender
 from app.agent.pipeline import run_ingestion_pipeline
 
 
-def test_deadline_merge_order_independence_direct():
+
+def test_deadline_merge_order_independence_integration(test_db):
+    from app.db.models import Tender, IngestionJob, IngestionStatusEnum
+    from app.agent.pipeline import run_ingestion_pipeline
+    import tempfile, os, json
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+    
+    # Create fake amendment PDFs with valid headers
+    pdf1 = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    pdf2 = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    parent_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    pdf1.write(b'%PDF-1.4\nfake content 1')
+    pdf2.write(b'%PDF-1.4\nfake content 2')
+    parent_pdf.write(b'%PDF-1.4\nfake content parent')
+    pdf1.close()
+    pdf2.close()
+    parent_pdf.close()
+    
+    job = IngestionJob(status=IngestionStatusEnum.PENDING)
+    test_db.add(job)
+    test_db.commit()
+    
+    meta2 = {
+        'tender_ref': 'TEST_DEADLINE_MERGE',
+        'is_parent': False,
+        'amendment_number': '2',
+        'latest_submission_deadline': '2026-12-01T15:00:00+00:00'
+    }
+    meta1 = {
+        'tender_ref': 'TEST_DEADLINE_MERGE',
+        'is_parent': False,
+        'amendment_number': '1',
+        'latest_submission_deadline': '2026-11-01T15:00:00+00:00'
+    }
+    meta_parent = {
+        'tender_ref': 'TEST_DEADLINE_MERGE',
+        'title': 'Parent',
+        'is_parent': True,
+        'submission_deadline': '2026-10-01T15:00:00+00:00'
+    }
+    catalog = {
+        os.path.basename(pdf2.name): meta2,
+        os.path.basename(pdf1.name): meta1,
+        os.path.basename(parent_pdf.name): meta_parent
+    }
+    
+    mock_parsed_doc = {
+        'document_hash': 'amendhash',
+        'full_text': 'test text',
+        'page_count': 1,
+        'detected_language': 'en'
+    }
+    
+    # We need a factory that returns a fresh session bound to the same engine
+    from sqlalchemy.orm import sessionmaker
+    TestSession = sessionmaker(bind=test_db.get_bind())
+    
+    # Run the real pipeline function. Process parent first.
+    with patch('app.agent.pipeline.CATALOG', new=catalog), \
+         patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
+         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name])
+        
+    tender = test_db.query(Tender).filter(Tender.tender_ref=='TEST_DEADLINE_MERGE').first()
+    assert tender.submission_deadline == datetime.fromisoformat('2026-10-01T15:00:00+00:00')
+
+    # Process Amendment 2 (later deadline)
+    with patch('app.agent.pipeline.CATALOG', new=catalog), \
+         patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
+         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf2.name])
+        
+    test_db.refresh(tender)
+    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+    
+    # Process Amendment 1 (earlier deadline)
+    with patch('app.agent.pipeline.CATALOG', new=catalog), \
+         patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
+         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf1.name])
+        
+    test_db.refresh(tender)
+    # Deadline should NOT be overwritten by the earlier amendment
+    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+
+    # Re-process Parent PDF (testing the regression case)
+    with patch('app.agent.pipeline.CATALOG', new=catalog), \
+         patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
+         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name])
+        
+    test_db.refresh(tender)
+    # Deadline should NOT be overwritten by the parent
+    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+
+def test_deadline_merge_order_independence_direct(test_db):
     from app.db.models import Tender
     from datetime import datetime, timezone
     

@@ -418,10 +418,13 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                     if meta["is_parent"]:
                         parent_meta = meta
                         deadline_dt = datetime.fromisoformat(parent_meta["submission_deadline"])
-                        tender.submission_deadline = deadline_dt
                         tender.original_deadline = deadline_dt
-                        tender.latest_deadline = deadline_dt
-                        tender.latest_deadline_source = parent_meta.get("latest_deadline_source")
+                        # Only update submission/latest deadline if we don't have one, or if the parent's is somehow later 
+                        # (prevents overriding a later amendment deadline if parent is re-processed)
+                        if not tender.submission_deadline or deadline_dt > tender.submission_deadline.replace(tzinfo=deadline_dt.tzinfo):
+                            tender.submission_deadline = deadline_dt
+                            tender.latest_deadline = deadline_dt
+                            tender.latest_deadline_source = parent_meta.get("latest_deadline_source")
                         tender.emd_amount = parent_meta.get("emd_amount")
                         tender.original_emd_amount = parent_meta.get("emd_amount")
                         tender.latest_emd_amount = parent_meta.get("emd_amount")

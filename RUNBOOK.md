@@ -147,7 +147,7 @@ docker compose down
 ## 6. Seed Data Ingestion & Integrity Verification
 
 ### 6.1 Seed Corpus Validation `[VERIFIED]`
-Run the standalone validation script to verify that all 15 PDF documents in `data/raw/` are authentic binary PDFs (checking `%PDF-` magic header):
+Run the standalone validation script to verify that all 4 PDF documents in `data/raw/` are authentic binary PDFs (checking `%PDF-` magic header):
 
 **Windows CMD / PowerShell / Linux:**
 ```bash
@@ -158,12 +158,11 @@ Expected output:
 ```text
 ======================================================================
 Tender Document Seed Integrity Verification
-======================================================================
-  [PASS] CESL-PM-eBus-Sewa-Tender-2-Amend-11_Clear-Copy-1.pdf (230,229 bytes)
   [PASS] cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf (4,036,054 bytes)
-  [PASS] cesl_pm_edrive_6230_electric_buses_gcc.pdf (10,616,140 bytes)
-  ...
-All 15 files in data/raw/ are verified genuine PDFs.
+  [PASS] cesl_pm_ebus_sewa_3_amendment.pdf (563,577 bytes)
+  [PASS] cesl_pm_ebus_sewa_3_amend_4.pdf (3,929,695 bytes)
+  [PASS] jctsl_jaipur_rfp.pdf (8,786,752 bytes)
+All 4 files in data/raw/ are verified genuine PDFs.
 ```
 
 ---
@@ -215,8 +214,8 @@ Expected Response (`200 OK` upon completion):
 {
   "job_id": "<job_id>",
   "status": "COMPLETED",
-  "total_documents": 15,
-  "completed_documents": 15,
+  "total_documents": 4,
+  "completed_documents": 4,
   "failed_documents": 0,
   "current_document": null,
   "started_at": "2026-08-20T13:30:01.000Z",
@@ -526,7 +525,7 @@ python scripts/e2e_playwright_test.py
 
 | Feature / Subsystem | Status Tag | Operational Notes |
 |---|---|---|
-| **15 PDF Document Ingestion Pipeline** | `[VERIFIED]` | PyMuPDF with `%PDF-` magic-byte validation. (Synthetic documents explicitly removed). |
+| **4 PDF Document Ingestion Pipeline** | `[VERIFIED]` | PyMuPDF with `%PDF-` magic-byte validation. (Synthetic documents explicitly removed). |
 | **Pydantic Structured Extraction** | `[VERIFIED]` | Extracts dates, EMD breakdowns, fleet sizes, turnover. |
 | **Deterministic Screening Engine** | `[VERIFIED]` | Enforces strict precedence ($NO\text{-}GO > REVIEW > GO$). |
 | **Hybrid SQL + Vector Retrieval** | `[VERIFIED]` | SQL temporal routing + 768d dense vector search. |
