@@ -61,11 +61,11 @@ CATALOG = {
             "Lot 1 (Rajasthan)": 8.25,
             "Lot 2 (Telangana)": 5.62,
             "Lot 3 (Gujarat)": 6.36,
-            "Lot 4 (Madhya Pradesh)": 10.00,
+            "Lot 4 (Madhya Pradesh)": 10.0,
             "Lot 5 (Andhra Pradesh)": 8.23,
             "Lot 6 (Chandigarh)": 10.66,
-            "Lot 7 (Karnataka)": 28.00,
-            "Lot 8 (Punjab)": 12.90,
+            "Lot 7 (Karnataka)": 28.0,
+            "Lot 8 (Punjab)": 12.9,
             "Lot 9 (Goa)": 1.43,
             "Lot 10 (Arunachal Pradesh)": 0.86,
             "Lot 11 (Dadar Nagar Haveli)": 1.35,
@@ -87,20 +87,6 @@ CATALOG = {
         "document_type": "AMENDMENT",
         "amendment_number": "Amendment No. 3",
         "source_url": "http://www.convergence.co.in/public/upload/tender_pdf/l6hjmz7na83xqvad64.pdf"
-    },
-    "cesl_pm_ebus_sewa_3_amend_1.pdf": {
-        "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 1",
-        "source_url": "http://www.convergence.co.in/amend1"
-    },
-    "cesl_pm_ebus_sewa_3_amend_2.pdf": {
-        "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 2",
-        "source_url": "http://www.convergence.co.in/amend2"
     },
     "cesl_pm_ebus_sewa_3_amend_4.pdf": {
         "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
@@ -127,189 +113,6 @@ CATALOG = {
         "emd_amount": 5000000.0,
         "document_fee": 5000.0,
         "source_url": "https://transport.rajasthan.gov.in/jctsl"
-    },
-    "cesl_pm_edrive_6230_electric_buses_gcc.pdf": {
-        "tender_ref": "CESL/06/2025-26/PM E-Drive/252601015",
-        "is_parent": True,
-        "document_type": "ORIGINAL_RFP",
-        "amendment_number": None,
-        "title": "Selection of Bus Operator for Procurement, Supply, Operation & Maintenance and Development of Allied Electric & Civil Infrastructure on Gross Cost Contracting (GCC) for 2,900 Electric Buses under PM E-DRIVE Scheme Tender-II & 3,330 for Delhi",
-        "issuing_authority": "Convergence Energy Services Limited (CESL)",
-        "city": "Pan-India & Delhi",
-        "state": "National",
-        "original_bus_quantity": 6230,
-        "latest_bus_quantity": 6230,
-        "latest_quantity_source": "Original RFP",
-        "submission_deadline": "2026-03-10T14:30:00+05:30",
-        "emd_amount": 1348200000.0,
-        "emd_breakdown": {
-            "Lot 1 (Pune)": 5.45,
-            "Lot 2 (Pune)": 25.94,
-            "Lot 3 (Mumbai)": 29.50,
-            "Lot 4 (Ahmedabad)": 4.54,
-            "Lot 5 (Hyderabad)": 6.09,
-            "Lot 6 (Delhi)": 14.70,
-            "Lot 7 (Delhi)": 37.20,
-            "Lot 8 (Delhi)": 11.40
-        },
-        "document_fee": 25000.0,
-        "source_url": "http://www.convergence.co.in/public/images/1978.pdf"
-    },
-    "pm_ebus_sewa_tender_1_full_rfp.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
-        "is_parent": True,
-        "document_type": "ORIGINAL_RFP",
-        "amendment_number": None,
-        "title": "Selection of Bus Operator for Procurement, Supply, Operation and Maintenance of 3,600 Electric Buses and Development of Allied Electric and Civil Infrastructure on Gross Cost Contracting (GCC) under PM-eBus Sewa (Tender 1)",
-        "issuing_authority": "Convergence Energy Services Limited (CESL)",
-        "city": "Pan-India",
-        "state": "National",
-        "original_bus_quantity": 3600,
-        "latest_bus_quantity": 3600,
-        "latest_quantity_source": "Original RFP",
-        "submission_deadline": "2024-01-25T14:30:00+05:30",
-        "emd_amount": 918900000.0,
-        "emd_breakdown": {
-            "Bihar": 10.99,
-            "Chandigarh": 3.09,
-            "Gujarat": 10.21,
-            "Haryana": 4.80,
-            "J&K": 4.78,
-            "Maharashtra": 37.61,
-            "Meghalaya": 1.06,
-            "Odisha": 8.83,
-            "Puducherry": 2.14,
-            "Punjab": 8.38
-        },
-        "document_fee": 25000.0,
-        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/1919-1.pdf"
-    },
-    "pm_ebus_sewa_tender_1_amend_5.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 5",
-        "latest_bus_quantity": 3725,
-        "latest_quantity_source": "Amendment No. 5 (Ref: CESL/06/2023-24/PM-eBusSewa/23241106/Amdt-5 Dated 17-01-2024)",
-        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_5_tenderNo1919.pdf"
-    },
-    "pm_ebus_sewa_tender_2_gcc.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013",
-        "is_parent": True,
-        "document_type": "ORIGINAL_RFP",
-        "amendment_number": None,
-        "title": "Selection of Bus Contractor for Procurement, Supply and Maintenance for 4,588 Electric Buses and Development of Allied Electric & Civil Infrastructure on Gross Cost Contract (GCC) model under PM-ebus Sewa Scheme (Tender 2)",
-        "issuing_authority": "Convergence Energy Services Limited (CESL)",
-        "city": "Pan-India",
-        "state": "National",
-        "original_bus_quantity": 4588,
-        "latest_bus_quantity": 3132,
-        "latest_quantity_source": "Amendment No. 11 (Ref: CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013/ Amdt-11 Dated 29.10.2024)",
-        "latest_deadline_source": "Amendment No. 13 (Ref: CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013/ Amdt-13 Dated 26.11.2024)",
-        "submission_deadline": "2024-12-10T14:30:00+05:30",
-        "emd_amount": 1275500000.0,
-        "emd_breakdown": {
-            "Package 1 - Ladakh": 0.41,
-            "Package 1 - Madhya Pradesh": 12.39,
-            "Package 1 - Chhattisgarh": 5.20,
-            "Package 1 - Rajasthan": 17.23,
-            "Package 1 - Uttarakhand": 2.60,
-            "Package 1 - Punjab": 8.48,
-            "Package 1 - Meghalaya": 0.57,
-            "Package 1 - Bihar": 12.15,
-            "Package 1 - Puducherry": 2.50,
-            "Package 1 - Gujarat": 11.71,
-            "Package 1 - Haryana": 12.00,
-            "Package 1 - Maharashtra": 3.32,
-            "Package 1 - Andhra Pradesh": 25.59,
-            "Package 2 - Madhya Pradesh (7m)": 2.68,
-            "Package 2 - Chhattisgarh (7m)": 0.83,
-            "Package 2 - Uttarakhand (7m)": 0.88,
-            "Package 2 - J&K (7m)": 1.84,
-            "Package 2 - Maharashtra (7m)": 3.94,
-            "Package 2 - Odisha (7m)": 1.42,
-            "Package 2 - Meghalaya (7m)": 0.79,
-            "Package 2 - Punjab (7m)": 1.02
-        },
-        "document_fee": 25000.0,
-        "source_url": "https://www.convergence.co.in/public/upload/tender_pdf/u4ou5ob7qbd4fby2sr.pdf"
-    },
-    "CESL-PM-eBus-Sewa-Tender-2-Amend-11_Clear-Copy-1.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 11",
-        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/11/CESL-PM-eBus-Sewa-Tender-2-Amend-11_Clear-Copy-1.pdf"
-    },
-    "CESL-PM-eBus-Sewa-Tender-2-Amend-12.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 12",
-        "source_url": "https://www.convergence.co.in/public/images/electric_bus/Amendment%20-12_tender%20no%201935.pdf"
-    },
-    "CESL-PM-eBus-Sewa-Tender-2-Amend-13.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 13",
-        "source_url": "https://www.convergence.co.in/public/images/electric_bus/Amendment-13_tender%20mo%201935.pdf"
-    },
-    "pm_ebus_sewa_tender_1_amend_1.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 1",
-        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_1_tenderNo1919.pdf"
-    },
-    "pm_ebus_sewa_tender_1_amend_2.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 2",
-        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_2_tenderNo1919.pdf"
-    },
-    "pm_ebus_sewa_tender_1_amend_3.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 3",
-        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_3_tenderNo1919.pdf"
-    },
-    "pm_ebus_sewa_tender_1_amend_4.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 4",
-        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_4_tenderNo1919.pdf"
-    },
-    "pm_ebus_sewa_tender_1_amend_6.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 6",
-        "source_url": "https://www.convergence.co.in/public/images/electric_bus/AmendNo_131_tenderNo1919%20%281%29.pdf"
-    },
-    "pm_ebus_sewa_tender_1_amend_7.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 7",
-        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_132_tenderNo1919-1.pdf"
-    },
-    "pm_ebus_sewa_tender_2_amend_2.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 2",
-        "source_url": "https://www.convergence.co.in/public/images/electric_bus/AmendNo_147_tenderNo1935.pdf"
-    },
-    "pm_ebus_sewa_tender_2_amend_3.pdf": {
-        "tender_ref": "CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 3",
-        "source_url": "https://www.convergence.co.in/public/images/electric_bus/AmendNo_03_tenderNo1935.pdf"
     }
 }
 
@@ -419,8 +222,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                         parent_meta = meta
                         deadline_dt = datetime.fromisoformat(parent_meta["submission_deadline"])
                         tender.original_deadline = deadline_dt
-                        # Only update submission/latest deadline if we don't have one, or if the parent's is somehow later 
-                        # (prevents overriding a later amendment deadline if parent is re-processed)
                         if not tender.submission_deadline or deadline_dt > tender.submission_deadline.replace(tzinfo=deadline_dt.tzinfo):
                             tender.submission_deadline = deadline_dt
                             tender.latest_deadline = deadline_dt

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Bus, LayoutDashboard, UserCheck, MessageSquare, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
-import { triggerIngestion, fetchIngestionStatus } from '../api/client';
+import { Bus, LayoutDashboard, UserCheck, MessageSquare, RefreshCw, CheckCircle, AlertTriangle, Search } from 'lucide-react';
+import { triggerIngestion, fetchIngestionStatus, triggerDiscovery } from '../api/client';
 
 export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }) {
   const [ingesting, setIngesting] = useState(false);
   const [jobProgress, setJobProgress] = useState(null);
+  
+  const [discovering, setDiscovering] = useState(false);
 
   const handleStartIngestion = async () => {
     try {
@@ -38,11 +40,24 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
     }
   };
 
+  const handleStartDiscovery = async () => {
+    try {
+      setDiscovering(true);
+      await triggerDiscovery();
+      alert("Discovery completed successfully!");
+      if (onIngestionCompleted) onIngestionCompleted(); // Refresh dashboard
+    } catch (err) {
+      alert("Failed to run discovery: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80 px-6 py-4">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         
-                <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <Bus className="w-5 h-5 text-white" />
           </div>
@@ -54,7 +69,7 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
           </div>
         </div>
 
-                <nav className="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
+        <nav className="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -92,7 +107,7 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
           </button>
         </nav>
 
-                <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
           {jobProgress && ingesting && (
             <div className="text-xs text-indigo-300 bg-indigo-950/60 border border-indigo-800/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
@@ -101,8 +116,17 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
           )}
 
           <button
+            onClick={handleStartDiscovery}
+            disabled={discovering || ingesting}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-md shadow-blue-900/20 transition-all"
+          >
+            <Search className={`w-3.5 h-3.5 ${discovering ? 'animate-pulse' : ''}`} />
+            <span>{discovering ? 'Discovering...' : 'Run Discovery'}</span>
+          </button>
+
+          <button
             onClick={handleStartIngestion}
-            disabled={ingesting}
+            disabled={ingesting || discovering}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-md shadow-emerald-900/20 transition-all"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${ingesting ? 'animate-spin' : ''}`} />

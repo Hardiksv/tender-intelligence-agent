@@ -49,6 +49,11 @@ export const triggerIngestion = async () => {
   return res.data;
 };
 
+export const triggerDiscovery = async () => {
+  const res = await api.post('/api/discover');
+  return res.data;
+};
+
 export const fetchIngestionStatus = async (jobId) => {
   const res = await api.get(`/api/ingestion/${jobId}`);
   return res.data;

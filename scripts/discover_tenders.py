@@ -22,6 +22,43 @@ DISCOVERY_ENABLED = settings.DISCOVERY_ENABLED
 POLITENESS_DELAY_SECONDS = 2       # Polite crawl delay between requests
 MAX_RETRIES = 3                     # Max retry attempts per document
 
+import re
+from typing import Optional
+from datetime import datetime, timezone
+
+_DATE_RE = re.compile(
+    r"(?P<date>\d{1,2}-\d{1,2}-\d{4})\s*"
+    r"(?:upto)?\s*"
+    r"\(\s*(?P<time>\d{1,2}:\d{2})\s*\)",
+    re.IGNORECASE,
+)
+
+def parse_cesl_deadline(raw: str) -> Optional[datetime]:
+    if not raw:
+        return None
+    match = _DATE_RE.search(raw)
+    if not match:
+        return None
+    date_part = match.group("date")
+    time_part = match.group("time")
+    try:
+        dt = datetime.strptime(f"{date_part} {time_part}", "%d-%m-%Y %H:%M")
+        return dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+def _find_current_tenders_table(soup):
+    table = soup.find("table", class_="tableBorder")
+    if table and "Tender Sale End Date" in table.get_text():
+        return table
+    for candidate in soup.find_all("table"):
+        header_text = candidate.get_text()
+        if "Tender Description" in header_text and "Tender Sale End Date" in header_text:
+            return candidate
+    return None
+
+
+
 
 class TenderSource(ABC):
     """Abstract interface for all tender discovery sources."""
@@ -65,7 +102,7 @@ class CESLTenderSource(TenderSource):
             soup = BeautifulSoup(response.text, 'html.parser')
             
             # Find the main tender table
-            table = soup.find('table', class_='tableBorder')
+            table = _find_current_tenders_table(soup)
             if not table:
                 logger.warning(f"[Discovery] {self.source_name}: Could not find tender table.")
                 return []
@@ -86,6 +123,10 @@ class CESLTenderSource(TenderSource):
 
                     nit_number = cols[2].text.strip()
                     sale_end = cols[5].text.strip()
+                    
+                    deadline = parse_cesl_deadline(sale_end)
+                    if not deadline or deadline <= datetime.now(timezone.utc):
+                        continue
 
                     candidates.append({
                         "title": title,
@@ -237,16 +278,12 @@ def run_discovery_cycle(sources: list[TenderSource], data_raw_dir: str):
                 db.refresh(job)
                 db.close()
                 
-                # Parse date or use a future default if extraction fails
+                # Parse date without fabricating fallback
                 sale_end = candidate.get("sale_end_date")
-                from datetime import datetime, timezone, timedelta
-                try:
-                    if sale_end:
-                        parsed_date = datetime.strptime(sale_end, "%d-%b-%Y %H:%M %p").isoformat()
-                    else:
-                        parsed_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
-                except Exception:
-                    parsed_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+                parsed_date = parse_cesl_deadline(sale_end)
+                if not parsed_date:
+                    logger.warning(f"[Discovery] Failed to parse sale_end '{sale_end}'. Skipping this tender.")
+                    continue
                 
                 custom_meta = {
                     file_name: {
@@ -255,7 +292,7 @@ def run_discovery_cycle(sources: list[TenderSource], data_raw_dir: str):
                         "document_type": "ORIGINAL_RFP",
                         "title": candidate.get("title", "Discovered Tender"),
                         "issuing_authority": source.source_name,
-                        "submission_deadline": parsed_date,
+                        "submission_deadline": parsed_date.isoformat(),
                         "source_url": candidate.get("document_url", "")
                     }
                 }

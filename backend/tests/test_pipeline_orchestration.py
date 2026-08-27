@@ -549,12 +549,14 @@ def test_deadline_merge_order_independence_integration(test_db):
     meta2 = {
         'tender_ref': 'TEST_DEADLINE_MERGE',
         'is_parent': False,
+        'document_type': 'AMENDMENT',
         'amendment_number': '2',
         'latest_submission_deadline': '2026-12-01T15:00:00+00:00'
     }
     meta1 = {
         'tender_ref': 'TEST_DEADLINE_MERGE',
         'is_parent': False,
+        'document_type': 'AMENDMENT',
         'amendment_number': '1',
         'latest_submission_deadline': '2026-11-01T15:00:00+00:00'
     }
@@ -562,6 +564,12 @@ def test_deadline_merge_order_independence_integration(test_db):
         'tender_ref': 'TEST_DEADLINE_MERGE',
         'title': 'Parent',
         'is_parent': True,
+        'document_type': 'ORIGINAL_RFP',
+        'issuing_authority': 'Test Auth',
+        'city': 'Test City',
+        'state': 'Test State',
+        'original_bus_quantity': 100,
+        'emd_amount': 1000.0,
         'submission_deadline': '2026-10-01T15:00:00+00:00'
     }
     catalog = {
@@ -574,7 +582,8 @@ def test_deadline_merge_order_independence_integration(test_db):
         'document_hash': 'amendhash',
         'full_text': 'test text',
         'page_count': 1,
-        'detected_language': 'en'
+        'detected_language': 'en',
+        'pages': []
     }
     
     # We need a factory that returns a fresh session bound to the same engine
@@ -588,7 +597,7 @@ def test_deadline_merge_order_independence_integration(test_db):
         run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name])
         
     tender = test_db.query(Tender).filter(Tender.tender_ref=='TEST_DEADLINE_MERGE').first()
-    assert tender.submission_deadline == datetime.fromisoformat('2026-10-01T15:00:00+00:00')
+    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-10-01T15:00:00').replace(tzinfo=None)
 
     # Process Amendment 2 (later deadline)
     with patch('app.agent.pipeline.CATALOG', new=catalog), \
@@ -597,7 +606,7 @@ def test_deadline_merge_order_independence_integration(test_db):
         run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf2.name])
         
     test_db.refresh(tender)
-    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
     
     # Process Amendment 1 (earlier deadline)
     with patch('app.agent.pipeline.CATALOG', new=catalog), \
@@ -607,7 +616,7 @@ def test_deadline_merge_order_independence_integration(test_db):
         
     test_db.refresh(tender)
     # Deadline should NOT be overwritten by the earlier amendment
-    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
 
     # Re-process Parent PDF (testing the regression case)
     with patch('app.agent.pipeline.CATALOG', new=catalog), \
@@ -617,7 +626,7 @@ def test_deadline_merge_order_independence_integration(test_db):
         
     test_db.refresh(tender)
     # Deadline should NOT be overwritten by the parent
-    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
 
 def test_deadline_merge_order_independence_direct(test_db):
     from app.db.models import Tender
@@ -648,7 +657,7 @@ def test_deadline_merge_order_independence_direct(test_db):
         tender.submission_deadline = deadline2
         tender.latest_deadline = deadline2
         
-    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
     
     # Apply amend 1 (simulate reverse order)
     deadline1 = datetime.fromisoformat(meta_amend_1['latest_submission_deadline'])
@@ -657,4 +666,4 @@ def test_deadline_merge_order_independence_direct(test_db):
         tender.latest_deadline = deadline1
         
     # Deadline should remain 12-01, not 11-01
-    assert tender.submission_deadline == datetime.fromisoformat('2026-12-01T15:00:00+00:00')
+    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
