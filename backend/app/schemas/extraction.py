@@ -25,9 +25,12 @@ class TenderExtractionSchema(BaseModel):
     issuing_authority: str = Field(description="Government authority issuing the tender.")
     city: str | None = Field(default=None, description="City where operations will take place.")
     state: str | None = Field(default=None, description="State where operations will take place.")
-    submission_deadline: str = Field(description="Submission closing deadline timestamp.")
+    # Optional: eligibility sections may not contain the deadline; catalog values fill this in.
+    submission_deadline: str | None = Field(default=None, description="Submission closing deadline timestamp (ISO 8601). Set null if not found in provided text.")
     emd_amount: float | None = Field(default=None, description="Earnest Money Deposit (EMD) cumulative amount in INR.")
     emd_breakdown: dict[str, float] | None = Field(default=None, description="Lot-wise or state-wise EMD breakdown in INR Crores.")
     document_fee: float | None = Field(default=None, description="Tender document fee in INR.")
-    scope_summary: str = Field(description="Comprehensive summary of bus operations scope.")
+    # Optional: eligibility sections may not contain full scope summary.
+    scope_summary: str | None = Field(default=None, description="Comprehensive summary of bus operations scope. Set null if not found.")
     eligibility: TenderEligibilitySchema = Field(description="Structured eligibility requirements.")
+

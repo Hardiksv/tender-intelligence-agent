@@ -497,6 +497,10 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                                 eligibility=extracted_elig,
                                 profile=profile_base
                             )
+                            # UPSERT: delete any existing rows then insert fresh one
+                            db.query(ScreeningResult).filter(
+                                ScreeningResult.tender_id == tender.id
+                            ).delete(synchronize_session=False)
                             screening_record = ScreeningResult(
                                 tender_id=tender.id,
                                 verdict=screening_res.verdict.value,
@@ -594,6 +598,11 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                     profile=profile_base
                 )
 
+                # UPSERT screening: delete any existing row for this tender before inserting new one.
+                # This prevents the class of bug where re-running ingestion creates duplicate rows.
+                db.query(ScreeningResult).filter(
+                    ScreeningResult.tender_id == tender.id
+                ).delete(synchronize_session=False)
                 screening_record = ScreeningResult(
                     tender_id=tender.id,
                     verdict=screening_res.verdict.value,

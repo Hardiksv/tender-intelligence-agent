@@ -94,7 +94,20 @@ def screen_tender_eligibility(
         ))
 
     if tender_state:
-        if tender_state.lower() in [g.lower() for g in profile.preferred_geographies]:
+        # DESIGN DECISION: A tender scoped "National" or "Pan-India" imposes no
+        # geographic restriction on bidders — any company operating anywhere in India
+        # is eligible. Treating it as a geography mismatch would be wrong.
+        # See DESIGN.md §Geography Screening for the full rationale.
+        national_scope_values = {"national", "pan-india", "pan india", "all india"}
+        is_national_scope = tender_state.lower().strip() in national_scope_values
+
+        if is_national_scope:
+            v = CriterionVerdict.PASS
+            reason = (
+                f"Tender is scoped National/Pan-India — no state restriction applies. "
+                f"All geographies are eligible."
+            )
+        elif tender_state.lower() in [g.lower() for g in profile.preferred_geographies]:
             v = CriterionVerdict.PASS
             reason = f"Tender state '{tender_state}' is listed in company preferred geographies."
         else:

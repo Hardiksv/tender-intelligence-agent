@@ -11,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
@@ -162,9 +163,12 @@ class CompanyProfile(Base):
 
 class ScreeningResult(Base):
     __tablename__ = "screening_results"
+    # Structural uniqueness: one active screening result per tender.
+    # This makes duplicate rows impossible at the DB level — not just by convention.
+    __table_args__ = (UniqueConstraint("tender_id", name="uq_screening_results_tender_id"),)
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    tender_id = Column(GUID, ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False)
+    tender_id = Column(GUID, ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False, unique=True)
     verdict = Column(SQLEnum(ScreeningVerdictEnum), nullable=False)
     reasoning = Column(Text, nullable=False)
     criteria_results = Column(JSONType, nullable=False)

@@ -27,7 +27,65 @@ def extract_tender_structured_data(full_text: str, document_name: str = "") -> d
     and applies currency/metric normalization.
     """
     prompt_template = load_extraction_prompt()
-    prompt = prompt_template.format(document_text=full_text[:12000])
+
+    # SMART TEXT SELECTION: The naive [:12000] slice only captures the document
+    # preamble/IFB section. For large RFPs (500+ pages), the actual eligibility
+    # criteria (fleet size, turnover, experience) appear in Section-2 ITB or
+    # Eligibility Criteria sections — often 50,000+ chars into the document.
+    # HIGH-SPECIFICITY ANCHORS: These appear in the actual "Qualifying Criteria for Bidder"
+    # section, not in administrative preamble or auditor/CA-firm sections.
+    # Ordered from most-specific (rarely appear outside bid criteria) to more general.
+    ELIGIBILITY_ANCHORS = [
+        # Most specific — only appear in bidder qualification tables
+        "Minimum Average Annual Turnover",
+        "MAAT",
+        "Qualification Criteria",
+        "qualifying requirements",
+        "Eligible Bidder",
+        "eligibility criteria",
+        "Minimum Fleet",
+        "minimum fleet size",
+        "years of experience in bus",
+        "Net Worth",
+        "annual turnover",
+        "minimum turnover",
+        "minimum experience",
+        "financial eligibility",
+        "technical eligibility",
+        "qualifying criteria",
+    ]
+    # Find the LAST occurrence of the most-specific anchors (eligibility criteria
+    # appear late in large RFPs; the first hit is often an index/TOC reference).
+    best_pos = 0
+    best_score = -1
+    for anchor in ELIGIBILITY_ANCHORS:
+        pos = 0
+        while True:
+            idx = full_text.lower().find(anchor.lower(), pos)
+            if idx < 0:
+                break
+            # Score: count how many OTHER anchors appear within 5000 chars
+            window = full_text[max(0, idx - 200): idx + 5000].lower()
+            score = sum(1 for a in ELIGIBILITY_ANCHORS if a.lower() in window)
+            if score > best_score:
+                best_score = score
+                best_pos = idx
+            pos = idx + 1
+
+    # Centre extraction window: header + eligibility section (up to 15000 chars)
+    doc_header = full_text[:2000]
+    if best_pos > 2000:
+        eligibility_section = full_text[max(0, best_pos - 200): best_pos + 13000]
+        extraction_text = doc_header + "\n\n[...]\n\n" + eligibility_section
+    else:
+        extraction_text = full_text[:12000]
+
+    logger.info(
+        f"Extraction text selection for {document_name}: "
+        f"best_pos={best_pos}, best_score={best_score}, "
+        f"extraction_text_len={len(extraction_text)}"
+    )
+    prompt = prompt_template.format(document_text=extraction_text[:15000])
 
     try:
         res = llm_client.generate_structured(
