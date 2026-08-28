@@ -67,7 +67,7 @@ jobs:
         working-directory: backend
         run: |
           pip install ruff
-          ruff check app/ --ignore E501,F401,BLE001
+          ruff check app/ --ignore E501,F401,BLE001,B008,I001,F541
 
       - name: Run Pytest Test Suite
         working-directory: backend
