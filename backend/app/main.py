@@ -24,17 +24,13 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown."""
     logger.info("Tender Intelligence API started.")
     try:
-        import os
         from app.db.database import SessionLocal
         from app.db.models import Tender, Document
         db = SessionLocal()
-        tender_count = db.query(Tender).count()
+        tender_count = db.query(Tender).filter(Tender.is_active == True).count()
         doc_count = db.query(Document).count()
         
-        data_raw_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "raw")
-        source_docs = len([f for f in os.listdir(data_raw_dir) if f.endswith(".pdf")]) if os.path.exists(data_raw_dir) else 0
-        
-        logger.info(f"STARTUP DB HEALTH CHECK: {tender_count} Tenders, {doc_count} DB Documents, {source_docs} Source PDFs in data/raw/")
+        logger.info(f"STARTUP DB HEALTH CHECK: {tender_count} Active Tenders, {doc_count} DB Documents")
         db.close()
         
         from app.core.config import settings
@@ -167,8 +163,8 @@ async def trigger_discovery_api():
     
     try:
         sources = [CESLTenderSource()]
-        data_raw_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "raw")
-        run_discovery_cycle(sources, data_raw_dir)
+        # Pass empty string since data_raw_dir is no longer used
+        run_discovery_cycle(sources, "")
         return {"status": "success", "message": "Discovery cycle completed"}
     except Exception as e:
         logger.error(f"Discovery API failed: {e}")

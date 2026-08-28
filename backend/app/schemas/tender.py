@@ -51,6 +51,7 @@ class TenderResponse(BaseModel):
     source_url: str | None = None
     source_name: str | None = None
     document_hash: str
+    is_active: bool = True
     created_at: str
     screening: ScreeningSummaryResponse | None = None
     eligibility: TenderEligibilityResponse | None = None

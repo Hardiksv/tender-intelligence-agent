@@ -332,7 +332,7 @@ async def list_tenders(
 
 @router.get("/daily-digest")
 async def get_daily_digest(db: Session = Depends(get_db)):
-    tenders = db.query(Tender).order_by(Tender.submission_deadline.asc()).all()
+    tenders = db.query(Tender).filter(Tender.is_active == True).order_by(Tender.submission_deadline.asc()).all()
     formatted = [format_tender_response(t) for t in tenders]
 
     go_tenders = [t for t in formatted if t.screening and t.screening.verdict == "GO"]
@@ -380,131 +380,6 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
             return format_tender_response(t)
         except Exception as e:
             logger.warning(f"Failed formatting database tender {tender_id}: {e}")
-
-    import hashlib
-    import uuid
-
-    from app.agent.pipeline import CATALOG
-
-    now_dt = datetime.now(UTC)
-    for fname, meta in CATALOG.items():
-        if not meta.get("is_parent"):
-            continue
-        gen_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
-        if gen_id == str(tender_id) or str(tender_id) in meta["tender_ref"] or str(tender_id) == meta.get("title"):
-            deadline_str = meta.get("submission_deadline")
-            try:
-                deadline_dt = datetime.fromisoformat(deadline_str)
-            except Exception:
-                deadline_dt = now_dt
-
-            if deadline_dt.tzinfo is None:
-                deadline_dt = deadline_dt.replace(tzinfo=UTC)
-
-            time_diff = deadline_dt - now_dt
-            days_rem = max(0, time_diff.days)
-            is_expired = time_diff.total_seconds() < 0
-            doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
-
-            from app.agent.pipeline import get_or_create_default_profile
-            from app.schemas.extraction import (
-                OtherRequirementItem,
-                TenderEligibilitySchema,
-            )
-            from app.schemas.profile import CompanyProfileBase
-            from app.services.screening import screen_tender_eligibility
-
-            try:
-                profile_db = get_or_create_default_profile(db)
-                profile = CompanyProfileBase(
-                    fleet_size=profile_db.fleet_size,
-                    annual_turnover=float(profile_db.annual_turnover),
-                    years_experience=profile_db.years_experience,
-                    past_contract_sizes=profile_db.past_contract_sizes or [],
-                    preferred_geographies=profile_db.preferred_geographies or []
-                )
-            except Exception:
-                profile = CompanyProfileBase(
-                    fleet_size=120, annual_turnover=150000000.0, years_experience=7,
-                    past_contract_sizes=[75000000.0, 90000000.0],
-                    preferred_geographies=["Rajasthan", "Haryana", "Delhi", "Gujarat"]
-                )
-
-            cat_elig = meta.get("eligibility") or {}
-            geo = [meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"]
-            elig_schema = TenderEligibilitySchema(
-                minimum_fleet_size=cat_elig.get("minimum_fleet_size", 80),
-                minimum_annual_turnover=cat_elig.get("minimum_annual_turnover", 1000000000.0),
-                minimum_experience_years=cat_elig.get("minimum_experience_years", 5),
-                minimum_past_contract_value=cat_elig.get("minimum_past_contract_value", 500000000.0),
-                required_geographies=cat_elig.get("required_geographies", geo),
-                other_requirements=[
-                    OtherRequirementItem(
-                        requirement_text="GCC bus operations experience required — verify against original RFP.",
-                        is_mandatory=False, page_number=None, clause_ref=None
-                    )
-                ]
-            )
-
-            try:
-                s_result = screen_tender_eligibility(
-                    tender_id=gen_id, tender_title=meta["title"],
-                    tender_state=meta.get("state"), eligibility=elig_schema, profile=profile
-                )
-                verdict_str = s_result.verdict.value if hasattr(s_result.verdict, "value") else str(s_result.verdict)
-                criteria_list = [
-                    {
-                        "criterion": c.criterion_name,
-                        "status": c.verdict.value if hasattr(c.verdict, "value") else str(c.verdict),
-                        "details": c.reason,
-                        "is_mandatory": c.is_mandatory,
-                        "company_value": c.company_value,
-                        "required_value": c.required_value,
-                    }
-                    for c in s_result.criteria_results
-                ]
-                screening_summary = ScreeningSummaryResponse(
-                    verdict=verdict_str, reasoning=s_result.reasoning,
-                    criteria_results=criteria_list, screened_at=now_dt.isoformat()
-                )
-            except Exception as se:
-                logger.warning(f"Catalog fallback screening failed for {gen_id}: {se}")
-                screening_summary = None
-
-
-            eligibility_summary = TenderEligibilityResponse(
-                minimum_fleet_size=elig_schema.minimum_fleet_size,
-                minimum_annual_turnover=float(elig_schema.minimum_annual_turnover) if elig_schema.minimum_annual_turnover is not None else None,
-                minimum_experience_years=elig_schema.minimum_experience_years,
-                minimum_past_contract_value=float(elig_schema.minimum_past_contract_value) if elig_schema.minimum_past_contract_value is not None else None,
-                required_geographies=elig_schema.required_geographies,
-                other_requirements=[]
-            )
-
-            return TenderResponse(
-                id=gen_id,
-                title=meta["title"],
-                issuing_authority=meta["issuing_authority"],
-                city=meta.get("city"),
-                state=meta.get("state"),
-                original_bus_quantity=meta.get("original_bus_quantity"),
-                latest_bus_quantity=meta.get("latest_bus_quantity"),
-                latest_quantity_source=meta.get("latest_quantity_source"),
-                category="bus_operations",
-                submission_deadline=deadline_dt.isoformat(),
-                timezone="Asia/Kolkata",
-                days_remaining=days_rem,
-                is_expired=is_expired,
-                emd_amount=float(meta["emd_amount"]) if meta.get("emd_amount") else None,
-                emd_breakdown=meta.get("emd_breakdown"),
-                document_fee=float(meta["document_fee"]) if meta.get("document_fee") else None,
-                scope_summary=meta["title"],
-                source_url=meta.get("source_url"),
-                source_name="Public Procurement Portal",
-                document_hash=doc_hash,
-                created_at=now_dt.isoformat(),
-                screening=screening_summary,
-                eligibility=eligibility_summary
-            )
+            raise HTTPException(status_code=500, detail="Error formatting tender")
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Tender {tender_id} not found.")

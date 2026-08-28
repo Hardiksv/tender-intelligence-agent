@@ -154,7 +154,7 @@ def test_extraction_called_from_pipeline(minimal_parsed_doc, mock_extraction_res
     mock_profile.past_contract_sizes = [75_000_000.0]
     mock_profile.preferred_geographies = ["Rajasthan"]
 
-    with patch("app.agent.pipeline.CATALOG", FAKE_CATALOG_ENTRY), \
+    with \
          patch("app.agent.pipeline.extract_tender_structured_data",
                return_value=mock_extraction_result) as mock_extract, \
          patch("app.agent.pipeline.screen_tender_eligibility",
@@ -196,7 +196,7 @@ def test_extraction_called_from_pipeline(minimal_parsed_doc, mock_extraction_res
 
         job_id = mock_job.id
         from app.agent.pipeline import run_ingestion_pipeline
-        run_ingestion_pipeline(job_id)
+        run_ingestion_pipeline(job_id, custom_pdf_paths=[f"/fake/path/{FAKE_FILENAME}"], custom_meta=FAKE_CATALOG_ENTRY)
 
         assert mock_extract.call_count >= 1, (
             f"Expected extract_tender_structured_data to be called at least once. "
@@ -219,7 +219,7 @@ def test_screening_called_after_extraction(minimal_parsed_doc, mock_extraction_r
     mock_profile.past_contract_sizes = [75_000_000.0]
     mock_profile.preferred_geographies = ["Rajasthan"]
 
-    with patch("app.agent.pipeline.CATALOG", FAKE_CATALOG_ENTRY), \
+    with \
          patch("app.agent.pipeline.extract_tender_structured_data",
                return_value=mock_extraction_result), \
          patch("app.agent.pipeline.screen_tender_eligibility",
@@ -253,7 +253,7 @@ def test_screening_called_after_extraction(minimal_parsed_doc, mock_extraction_r
         mock_db.commit.return_value = None
 
         from app.agent.pipeline import run_ingestion_pipeline
-        run_ingestion_pipeline(mock_job.id)
+        run_ingestion_pipeline(mock_job.id, custom_pdf_paths=[f'/fake/path/{FAKE_FILENAME}'], custom_meta=FAKE_CATALOG_ENTRY)
 
         assert mock_screen.call_count >= 1, (
             f"Expected screen_tender_eligibility to be called at least once. "
@@ -591,38 +591,34 @@ def test_deadline_merge_order_independence_integration(test_db):
     TestSession = sessionmaker(bind=test_db.get_bind())
     
     # Run the real pipeline function. Process parent first.
-    with patch('app.agent.pipeline.CATALOG', new=catalog), \
-         patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
+    with patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
          patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
-        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name])
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name], custom_meta=catalog)
         
     tender = test_db.query(Tender).filter(Tender.tender_ref=='TEST_DEADLINE_MERGE').first()
     assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-10-01T15:00:00').replace(tzinfo=None)
 
     # Process Amendment 2 (later deadline)
-    with patch('app.agent.pipeline.CATALOG', new=catalog), \
-         patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
+    with patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
          patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
-        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf2.name])
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf2.name], custom_meta=catalog)
         
     test_db.refresh(tender)
     assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
     
     # Process Amendment 1 (earlier deadline)
-    with patch('app.agent.pipeline.CATALOG', new=catalog), \
-         patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
+    with patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
          patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
-        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf1.name])
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf1.name], custom_meta=catalog)
         
     test_db.refresh(tender)
     # Deadline should NOT be overwritten by the earlier amendment
     assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
 
     # Re-process Parent PDF (testing the regression case)
-    with patch('app.agent.pipeline.CATALOG', new=catalog), \
-         patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
+    with patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
          patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
-        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name])
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name], custom_meta=catalog)
         
     test_db.refresh(tender)
     # Deadline should NOT be overwritten by the parent

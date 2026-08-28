@@ -42,79 +42,6 @@ def get_or_create_default_profile(db: Session) -> CompanyProfile:
         db.commit()
         db.refresh(profile)
     return profile
-CATALOG = {
-    "cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf": {
-        "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
-        "is_parent": True,
-        "document_type": "ORIGINAL_RFP",
-        "amendment_number": None,
-        "title": "Selection of Bus Operator for Procurement, Supply, Operation and Maintenance of 3,604 Electric Buses and Development of Allied Electric and Civil Infrastructure on Gross Cost Contracting (GCC) under PM-eBus Sewa (Tender 3)",
-        "issuing_authority": "Convergence Energy Services Limited (CESL)",
-        "city": "Pan-India",
-        "state": "National",
-        "original_bus_quantity": 3604,
-        "latest_bus_quantity": 3604,
-        "latest_quantity_source": "Original RFP",
-        "submission_deadline": "2024-12-10T14:30:00+05:30",
-        "emd_amount": 1131000000.0,
-        "emd_breakdown": {
-            "Lot 1 (Rajasthan)": 8.25,
-            "Lot 2 (Telangana)": 5.62,
-            "Lot 3 (Gujarat)": 6.36,
-            "Lot 4 (Madhya Pradesh)": 10.0,
-            "Lot 5 (Andhra Pradesh)": 8.23,
-            "Lot 6 (Chandigarh)": 10.66,
-            "Lot 7 (Karnataka)": 28.0,
-            "Lot 8 (Punjab)": 12.9,
-            "Lot 9 (Goa)": 1.43,
-            "Lot 10 (Arunachal Pradesh)": 0.86,
-            "Lot 11 (Dadar Nagar Haveli)": 1.35,
-            "Lot 12 (Andaman & Nicobar)": 1.57,
-            "Lot 13 (Himachal Pradesh)": 1.56,
-            "Lot 14 (Manipur)": 0.61,
-            "Lot 15 (Kerala)": 11.48,
-            "Lot 16 (Jammu & Kashmir)": 1.77,
-            "Lot 17 (Ladakh)": 1.18,
-            "Lot 18 (Arunachal Pradesh)": 0.48,
-            "Lot 19 (Manipur)": 0.79
-        },
-        "document_fee": 25000.0,
-        "source_url": "http://www.convergence.co.in/public/upload/tender_pdf/x845qy239kcl5sk8ld.pdf"
-    },
-    "cesl_pm_ebus_sewa_3_amendment.pdf": {
-        "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 3",
-        "source_url": "http://www.convergence.co.in/public/upload/tender_pdf/l6hjmz7na83xqvad64.pdf"
-    },
-    "cesl_pm_ebus_sewa_3_amend_4.pdf": {
-        "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
-        "is_parent": False,
-        "document_type": "AMENDMENT",
-        "amendment_number": "Amendment No. 4",
-        "latest_submission_deadline": "2026-09-11T16:00:00+05:30",
-        "latest_deadline_source": "Amendment No. 4",
-        "source_url": "http://www.convergence.co.in/amend4"
-    },
-    "jctsl_jaipur_rfp.pdf": {
-        "tender_ref": "NIB No. 11/2025-26",
-        "is_parent": True,
-        "document_type": "ORIGINAL_RFP",
-        "amendment_number": None,
-        "title": "Selection of Bus Operator for Procurement, Supply, Operation and Maintenance of 50 Fully Built Pure Electric Double Decker AC Buses on Gross Cost Contracting (GCC)",
-        "issuing_authority": "JCTSL",
-        "city": "Jaipur",
-        "state": "Rajasthan",
-        "original_bus_quantity": 50,
-        "latest_bus_quantity": 50,
-        "latest_quantity_source": "Original RFP",
-        "submission_deadline": "2026-09-22T18:00:00+05:30",
-        "emd_amount": 5000000.0,
-        "document_fee": 5000.0,
-        "source_url": "https://transport.rajasthan.gov.in/jctsl"
-    }
-}
 
 
 def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = None, custom_meta: dict | None = None):
@@ -134,8 +61,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
         log_action("INGESTION_STARTED", job_id=job_id, status="RUNNING")
 
         pdf_files = custom_pdf_paths if custom_pdf_paths else []
-        if not custom_pdf_paths:
-            pdf_files = glob.glob(os.path.join(SEED_DATA_DIR, "*.pdf"))
         
         job.total_documents = len(pdf_files)
         db.commit()
@@ -148,12 +73,9 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
             meta = None
             if custom_meta and file_name in custom_meta:
                 meta = custom_meta[file_name]
-            
-            if not meta:
-                meta = CATALOG.get(file_name)
 
             if not meta:
-                logger.warning(f"File {file_name} not in catalog. Skipping.")
+                logger.warning(f"File {file_name} has no provided metadata. Skipping.")
                 job.failed_documents += 1
                 db.commit()
                 continue
@@ -167,7 +89,7 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                 if not tender:
                     parent_meta = meta
                     if not meta["is_parent"]:
-                        for mdata in CATALOG.values():
+                        for mdata in custom_meta.values() if custom_meta else []:
                             if mdata.get("tender_ref") == tender_ref and mdata.get("is_parent"):
                                 parent_meta = mdata
                                 break

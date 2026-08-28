@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timezone
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -122,6 +123,8 @@ class Tender(Base):
     raw_document_path = Column(String(1000), nullable=False)
     document_hash = Column(String(64), unique=True, nullable=False, index=True)
 
+    is_active = Column(Boolean, default=True, nullable=False, server_default="true")
+    
     extraction_provenance = Column(JSONType, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)

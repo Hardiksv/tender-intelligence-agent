@@ -75,7 +75,7 @@ def parse_pdf_document(file_path: str) -> dict[str, Any]:
                     img_bytes = pix.tobytes("png")
                     res = requests.post(
                         'https://api.ocr.space/parse/image',
-                        data={'apikey': 'helloworld', 'language': 'eng', 'scale': 'true'},
+                        data={'apikey': os.environ.get('OCR_SPACE_API_KEY', ''), 'language': 'eng', 'scale': 'true'},
                         files={'file': ('page.png', img_bytes)},
                         timeout=15
                     )
