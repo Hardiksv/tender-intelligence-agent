@@ -350,9 +350,9 @@ def start_discovery_scheduler(interval_minutes: int = 60):
     Starts a background thread that runs discovery on a configurable interval.
     Respects DISCOVERY_ENABLED kill switch on every cycle.
     """
-    data_raw_dir = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "data", "raw"
-    )
+    data_raw_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "raw"))
+    if not os.path.exists(data_raw_dir):
+        data_raw_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw"))
     sources = [CESLTenderSource()]
 
     def scheduler_loop():
@@ -367,6 +367,19 @@ def start_discovery_scheduler(interval_minutes: int = 60):
     thread.start()
     logger.info(f"[Discovery] Scheduler started. Interval: {interval_minutes} minutes. Kill switch: DISCOVERY_ENABLED={settings.DISCOVERY_ENABLED}")
     return thread
+
+
+def _get_data_raw_dir() -> str:
+    candidate = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "raw"))
+    if not os.path.exists(candidate):
+        alt = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw"))
+        if os.path.exists(os.path.dirname(alt)):
+            candidate = alt
+    try:
+        os.makedirs(candidate, exist_ok=True)
+    except Exception:
+        pass
+    return candidate
 
 
 def run_discovery_and_ingest_job(job_id: str):
@@ -384,6 +397,7 @@ def run_discovery_and_ingest_job(job_id: str):
         return
 
     temp_files_to_clean = []
+    data_raw_dir = _get_data_raw_dir()
     try:
         # 1. Update job to RUNNING
         job.status = IngestionStatusEnum.RUNNING
@@ -468,15 +482,35 @@ def run_discovery_and_ingest_job(job_id: str):
                     logger.info(f"[Discovery] Document hash {doc_hash[:8]} already exists. Skipping.")
                     continue
 
-                # Save new PDF
-                file_name = candidate.get("file_name") or f"discovered_{doc_hash[:12]}.pdf"
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="discovered_tender_")
-                temp_file.write(content)
-                temp_file.close()
-                temp_files_to_clean.append(temp_file.name)
+                # Save new PDF into data/raw directory
+                raw_file_name = candidate.get("file_name") or f"discovered_{doc_hash[:12]}.pdf"
+                clean_name = "".join(c for c in raw_file_name if c.isalnum() or c in "._-")
+                if not clean_name.endswith(".pdf"):
+                    clean_name += ".pdf"
 
-                actual_file_name = os.path.basename(temp_file.name)
-                pdf_paths.append(temp_file.name)
+                saved_in_data_raw = False
+                save_path = None
+                if os.path.exists(data_raw_dir) and os.access(data_raw_dir, os.W_OK):
+                    save_path = os.path.join(data_raw_dir, clean_name)
+                    try:
+                        with open(save_path, "wb") as f:
+                            f.write(content)
+                        saved_in_data_raw = True
+                        actual_file_name = clean_name
+                        logger.info(f"[Discovery] Discovered tender PDF saved to: {save_path}")
+                    except Exception as e:
+                        logger.warning(f"[Discovery] Could not write directly to {data_raw_dir}: {e}")
+                        saved_in_data_raw = False
+
+                if not saved_in_data_raw:
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="discovered_tender_")
+                    temp_file.write(content)
+                    temp_file.close()
+                    temp_files_to_clean.append(temp_file.name)
+                    save_path = temp_file.name
+                    actual_file_name = os.path.basename(temp_file.name)
+
+                pdf_paths.append(save_path)
                 combined_meta[actual_file_name] = {
                     "tender_ref": tender_ref or doc_hash[:10],
                     "is_parent": True,
@@ -493,7 +527,7 @@ def run_discovery_and_ingest_job(job_id: str):
                     try:
                         import requests
                         link_val = candidate.get('document_url', 'N/A')
-                        requests.post(webhook_url, json={"content": f"🚨 **New Tender Discovered!** 🚨\n**Source:** {source.source_name}\n**File:** {file_name}\n**Link:** {link_val}"}, timeout=5)
+                        requests.post(webhook_url, json={"content": f"🚨 **New Tender Discovered!** 🚨\n**Source:** {source.source_name}\n**File:** {actual_file_name}\n**Link:** {link_val}"}, timeout=5)
                     except Exception as e:
                         logger.error(f"[Discovery] Failed to send Discord webhook: {e}")
 
@@ -533,11 +567,12 @@ def run_discovery_and_ingest_job(job_id: str):
             except Exception:
                 pass
     finally:
-        # Clean up temp files
+        # Clean up only temporary files (not files in data/raw)
         for path in temp_files_to_clean:
             if os.path.exists(path):
                 try:
                     os.unlink(path)
                 except Exception as ce:
                     logger.warning(f"[Discovery] Failed to delete temp file {path}: {ce}")
+
 
