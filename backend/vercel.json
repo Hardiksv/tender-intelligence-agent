@@ -4,5 +4,10 @@
       "path": "/api/discover",
       "schedule": "0 0 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*.py": {
+      "maxDuration": 60
+    }
+  }
 }
