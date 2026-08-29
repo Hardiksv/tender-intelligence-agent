@@ -21,9 +21,9 @@ The application loads environment variables dynamically via `pydantic-settings` 
 | Environment Variable | Required / Optional | Default Value | Verification Status | Purpose & Behavior |
 |---|---|---|---|---|
 | `DATABASE_URL` | `[CONFIGURATION REQUIRED]` | `sqlite:///tender_intelligence.db` | `[VERIFIED]` | PostgreSQL connection URI (`postgresql://...`). If unreachable or omitted, engine falls back to local SQLite (`tender_intelligence.db`). |
-| `LLM_API_KEY` | `[CONFIGURATION REQUIRED]` | `""` | `[VERIFIED]` | Groq API Key (e.g. `gsk_...`) or LiteLLM provider key. Used for structured extraction and RAG response synthesis. |
-| `LLM_MODEL` | `[OPTIONAL]` | `groq/openai/gpt-oss-120b` | `[VERIFIED]` | Primary model for extraction and Q&A. |
-| `LLM_FALLBACK_MODEL` | `[OPTIONAL]` | `groq/qwen/qwen3.6-27b` | `[VERIFIED]` | Automatic fallback model triggered if primary model encounters rate limits or errors. |
+| `LLM_API_KEY` | `[CONFIGURATION REQUIRED]` | `""` | `[VERIFIED]` | Gemini API Key (e.g. `gsk_...`) or LiteLLM provider key. Used for structured extraction and RAG response synthesis. |
+| `LLM_MODEL` | `[OPTIONAL]` | `gemini/gemini-flash-latest` | `[VERIFIED]` | Primary model for extraction and Q&A. |
+| `LLM_FALLBACK_MODEL` | `[OPTIONAL]` | `gemini/gemini-3.5-flash` | `[VERIFIED]` | Automatic fallback model triggered if primary model encounters rate limits or errors. |
 | `EMBEDDING_API_KEY` | `[CONFIGURATION REQUIRED]` | `""` | `[VERIFIED]` | Jina AI API key (`jina_...`) for 768-dim embeddings. |
 | `EMBEDDING_MODEL` | `[OPTIONAL]` | `jina-embeddings-v5-omni-small` | `[VERIFIED]` | Embedding model name. |
 | `EMBEDDING_DIMENSION` | `[OPTIONAL]` | `768` | `[VERIFIED]` | Target vector dimensionality (must match database vector column). |
@@ -50,7 +50,7 @@ cp .env.example .env
 
 Ensure `.env` contains your valid API keys:
 ```env
-LLM_API_KEY=gsk_your_groq_api_key
+LLM_API_KEY=your_gemini_api_key
 EMBEDDING_API_KEY=jina_your_jina_api_key
 DATABASE_URL=sqlite:///tender_intelligence.db
 ```
@@ -158,7 +158,7 @@ Expected output:
 ```text
 ======================================================================
 Tender Document Seed Integrity Verification
-  [PASS] cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf (4,036,054 bytes)
+  [PASS] cesl_pm_ebus_sewa_3_3<extracted_fleet_size>_buses_gcc.pdf (4,036,054 bytes)
   [PASS] cesl_pm_ebus_sewa_3_amendment.pdf (563,577 bytes)
   [PASS] cesl_pm_ebus_sewa_3_amend_4.pdf (3,929,695 bytes)
   [PASS] jctsl_jaipur_rfp.pdf (8,786,752 bytes)
@@ -266,7 +266,7 @@ Expected Response (`HTTP 409 Conflict`):
       {
         "id": "c1f76d91-5b23-4e4b-b0b2-32b04f7a29e1",
         "tender_ref": "CESL/06/2026-27/PM-eBus Sewa3/262704003",
-        "title": "Selection of Bus Operator for Procurement of 3,604 Electric Buses under PM-eBus Sewa (Tender 3)",
+        "title": "Selection of Bus Operator for Procurement of <extracted_fleet_size> Electric Buses under <Dynamic Live Tender Name>",
         "issuing_authority": "Convergence Energy Services Limited (CESL)",
         "city": "Multi-City",
         "state": "Pan-India",
@@ -357,16 +357,16 @@ Expected Response (`HTTP 409 Conflict`):
     "citations": [
       {
         "tender_id": "c1f76d91-5b23-4e4b-b0b2-32b04f7a29e1",
-        "tender_title": "Selection of Bus Operator for Procurement of 3,604 Electric Buses under PM-eBus Sewa (Tender 3)",
-        "document_name": "cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf",
+        "tender_title": "Selection of Bus Operator for Procurement of <extracted_fleet_size> Electric Buses under <Dynamic Live Tender Name>",
+        "document_name": "cesl_pm_ebus_sewa_3_3<extracted_fleet_size>_buses_gcc.pdf",
         "page_number": 14,
         "chunk_index": 2,
         "snippet": "Earnest Money Deposit (EMD): Lot 1 (Rajasthan) INR 8.25 Crore..."
       }
     ],
-    "model_used": "groq/openai/gpt-oss-120b",
+    "model_used": "gemini/gemini-flash-latest",
     "usage": {
-      "model": "groq/openai/gpt-oss-120b",
+      "model": "gemini/gemini-flash-latest",
       "prompt_tokens": 1240,
       "completion_tokens": 185,
       "total_tokens": 1425,
@@ -406,7 +406,7 @@ Add the following configuration to `claude_desktop_config.json`:
         "C:/Users/hardi/Desktop/tender-intelligence-agent/backend/app/mcp/server.py"
       ],
       "env": {
-        "LLM_API_KEY": "gsk_your_groq_api_key",
+        "LLM_API_KEY": "your_gemini_api_key",
         "EMBEDDING_API_KEY": "jina_your_jina_api_key",
         "DATABASE_URL": "sqlite:///C:/Users/hardi/Desktop/tender-intelligence-agent/tender_intelligence.db"
       }
@@ -509,10 +509,10 @@ python scripts/e2e_playwright_test.py
 
 ---
 
-### 10.3 Groq Primary API Rate Limiting / 429 Error `[VERIFIED]`
+### 10.3 Gemini API Rate Limiting / 429 Error `[VERIFIED]`
 - **Symptom:** Primary model returns `429 Too Many Requests`.
-- **Automatic Fallback:** The backend caught exception automatically and executes request via fallback model `groq/qwen/qwen3.6-27b`.
-- **Fix:** If both providers fail, verify `LLM_API_KEY` quota at `console.groq.com`.
+- **Automatic Fallback:** The backend caught exception automatically and executes request via fallback model `gemini/gemini-3.5-flash`.
+- **Fix:** If both providers fail, verify `LLM_API_KEY` quota at `aistudio.google.com`.
 
 ---
 
