@@ -148,7 +148,19 @@ class LiteLLMClient(AbstractLLMClient):
                     raw_text = raw_text.split("</think>")[-1].strip()
                 if "<think" in raw_text:
                     raise RuntimeError("Model output was truncated mid-reasoning (missing </think> tag).")
-                parsed_json = json.loads(raw_text)
+                
+                # Strip markdown code block wrappers if present
+                clean_text = raw_text.strip()
+                if clean_text.startswith("```"):
+                    if "json" in clean_text[:20]:
+                        clean_text = clean_text.split("json", 1)[-1]
+                    else:
+                        clean_text = clean_text.split("```", 1)[-1]
+                    if clean_text.endswith("```"):
+                        clean_text = clean_text.rsplit("```", 1)[0]
+                    clean_text = clean_text.strip()
+                
+                parsed_json = json.loads(clean_text)
                 validated_obj = response_model.model_validate(parsed_json)
                 usage = self._extract_usage(response, model, "structured_extraction")
 
