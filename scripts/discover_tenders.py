@@ -367,3 +367,177 @@ def start_discovery_scheduler(interval_minutes: int = 60):
     thread.start()
     logger.info(f"[Discovery] Scheduler started. Interval: {interval_minutes} minutes. Kill switch: DISCOVERY_ENABLED={settings.DISCOVERY_ENABLED}")
     return thread
+
+
+def run_discovery_and_ingest_job(job_id: str):
+    from app.db.database import SessionLocal
+    from app.db.models import IngestionJob, IngestionStatusEnum, Tender, Document
+    from app.agent.pipeline import run_ingestion_pipeline
+    import tempfile
+    import os
+
+    db = SessionLocal()
+    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+    if not job:
+        logger.error(f"IngestionJob {job_id} not found.")
+        db.close()
+        return
+
+    temp_files_to_clean = []
+    try:
+        # 1. Update job to RUNNING
+        job.status = IngestionStatusEnum.RUNNING
+        job.started_at = datetime.now(timezone.utc)
+        db.commit()
+
+        # 2. Run discovery on sources
+        sources = [CESLTenderSource()]
+        all_candidates = []
+        for source in sources:
+            try:
+                candidates = source.discover()
+                all_candidates.extend((source, c) for c in candidates)
+            except Exception as e:
+                logger.error(f"[Discovery] Source {source.source_name} failed: {e}", exc_info=True)
+
+        if not all_candidates:
+            logger.info("[Discovery] No candidates discovered from any source.")
+            job.status = IngestionStatusEnum.COMPLETED
+            job.completed_at = datetime.now(timezone.utc)
+            db.commit()
+            db.close()
+            return
+
+        # 3. Assess which candidates need download/processing
+        pdf_paths = []
+        combined_meta = {}
+        
+        discovered_refs = set()
+
+        for source, candidate in all_candidates:
+            tender_ref = candidate.get("tender_ref")
+            if tender_ref:
+                discovered_refs.add(tender_ref)
+
+            sale_end = candidate.get("sale_end_date")
+            parsed_date = parse_cesl_deadline(sale_end)
+            if not parsed_date:
+                logger.warning(f"[Discovery] Failed to parse sale_end '{sale_end}'. Skipping.")
+                continue
+
+            existing_tender = None
+            if tender_ref:
+                existing_tender = db.query(Tender).filter(Tender.tender_ref == tender_ref).first()
+
+            if existing_tender:
+                # If deadline has been extended
+                if not existing_tender.submission_deadline or parsed_date > existing_tender.submission_deadline.replace(tzinfo=parsed_date.tzinfo):
+                    logger.info(f"[Discovery] Deadline updated on portal for {tender_ref}. Scheduling corrigendum update.")
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="dummy_amendment_")
+                    temp_file.write(b"%PDF-1.4 empty dummy")
+                    temp_file.close()
+                    temp_files_to_clean.append(temp_file.name)
+                    
+                    file_name = os.path.basename(temp_file.name)
+                    pdf_paths.append(temp_file.name)
+                    combined_meta[file_name] = {
+                        "tender_ref": tender_ref,
+                        "is_parent": False,
+                        "document_type": "CORRIGENDUM",
+                        "latest_submission_deadline": parsed_date.isoformat(),
+                        "amendment_number": "Portal_Update"
+                    }
+                else:
+                    logger.info(f"[Discovery] Tender {tender_ref} already up to date.")
+                    if not existing_tender.is_active:
+                        existing_tender.is_active = True
+                        db.commit()
+            else:
+                # New tender: fetch PDF
+                logger.info(f"[Discovery] New tender found: {tender_ref}. Downloading...")
+                content = source.fetch_document(candidate)
+                if not content:
+                    logger.error(f"[Discovery] Could not fetch PDF for new tender: {candidate.get('document_url')}")
+                    continue
+
+                doc_hash = compute_document_hash(content)
+                
+                # Check DB doc hash
+                existing_doc = db.query(Document).filter(Document.document_hash == doc_hash).first()
+                if existing_doc:
+                    logger.info(f"[Discovery] Document hash {doc_hash[:8]} already exists. Skipping.")
+                    continue
+
+                # Save new PDF
+                file_name = candidate.get("file_name") or f"discovered_{doc_hash[:12]}.pdf"
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="discovered_tender_")
+                temp_file.write(content)
+                temp_file.close()
+                temp_files_to_clean.append(temp_file.name)
+
+                actual_file_name = os.path.basename(temp_file.name)
+                pdf_paths.append(temp_file.name)
+                combined_meta[actual_file_name] = {
+                    "tender_ref": tender_ref or doc_hash[:10],
+                    "is_parent": True,
+                    "document_type": "ORIGINAL_RFP",
+                    "title": candidate.get("title", "Discovered Tender"),
+                    "issuing_authority": source.source_name,
+                    "submission_deadline": parsed_date.isoformat(),
+                    "source_url": candidate.get("document_url", "")
+                }
+
+                # Discord webhook
+                webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
+                if webhook_url:
+                    try:
+                        import requests
+                        link_val = candidate.get('document_url', 'N/A')
+                        requests.post(webhook_url, json={"content": f"🚨 **New Tender Discovered!** 🚨\n**Source:** {source.source_name}\n**File:** {file_name}\n**Link:** {link_val}"}, timeout=5)
+                    except Exception as e:
+                        logger.error(f"[Discovery] Failed to send Discord webhook: {e}")
+
+        # Reconciliation: mark tenders as inactive if not seen
+        for source in sources:
+            all_source_tenders = db.query(Tender).filter(Tender.issuing_authority == source.source_name).all()
+            for t in all_source_tenders:
+                if t.tender_ref and t.tender_ref not in discovered_refs:
+                    if t.is_active:
+                        logger.info(f"[Discovery] Tender {t.tender_ref} no longer on portal. Marking inactive.")
+                        t.is_active = False
+            db.commit()
+
+        if not pdf_paths:
+            logger.info("[Discovery] No new documents or updates to ingest.")
+            job.status = IngestionStatusEnum.COMPLETED
+            job.completed_at = datetime.now(timezone.utc)
+            db.commit()
+            db.close()
+            return
+
+        # 4. Trigger Ingestion Pipeline on all gathered files
+        # Close our database session to avoid lock conflicts during ingestion pipeline runs
+        db.close()
+        
+        run_ingestion_pipeline(job_id, custom_pdf_paths=pdf_paths, custom_meta=combined_meta)
+
+    except Exception as e:
+        logger.error(f"[Discovery] Discovery background task failed: {e}", exc_info=True)
+        if 'db' in locals() and db:
+            try:
+                job.status = IngestionStatusEnum.FAILED
+                job.error_message = str(e)
+                job.completed_at = datetime.now(timezone.utc)
+                db.commit()
+                db.close()
+            except Exception:
+                pass
+    finally:
+        # Clean up temp files
+        for path in temp_files_to_clean:
+            if os.path.exists(path):
+                try:
+                    os.unlink(path)
+                except Exception as ce:
+                    logger.warning(f"[Discovery] Failed to delete temp file {path}: {ce}")
+

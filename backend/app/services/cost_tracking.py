@@ -33,8 +33,17 @@ def calculate_llm_cost(usage: dict[str, Any]) -> dict[str, Any]:
         pricing_source = f"LiteLLM Cost Map ({model})"
     except Exception:
         # Fallback if model not in litellm's pricing map
-        total_cost_usd = 0.0
-        pricing_source = f"Unpriced Model ({model})"
+        fallback_rates = {
+            "groq/openai/gpt-oss-120b": {"p": 0.0015, "c": 0.002},
+            "groq/qwen/qwen3.6-27b": {"p": 0.0005, "c": 0.001}
+        }
+        if model in fallback_rates:
+            rates = fallback_rates[model]
+            total_cost_usd = (prompt_tokens / 1000.0) * rates["p"] + (completion_tokens / 1000.0) * rates["c"]
+            pricing_source = f"Manual Fallback ({model})"
+        else:
+            total_cost_usd = 0.0
+            pricing_source = f"Unpriced Model ({model})"
 
     total_cost_inr = total_cost_usd * USD_TO_INR
 

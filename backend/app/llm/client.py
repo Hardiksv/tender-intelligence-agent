@@ -81,10 +81,10 @@ class LiteLLMClient(AbstractLLMClient):
                     api_key=self.api_key if (self.api_key and self.api_key != "mock_key_for_testing") else None
                 )
                 content = response.choices[0].message.content
-                if "<think" in content and "</think>" not in content:
-                    raise RuntimeError("Model output was truncated mid-reasoning (missing </think> tag).")
                 if "</think>" in content:
                     content = content.split("</think>")[-1].strip()
+                if "<think" in content:
+                    raise RuntimeError("Model output was truncated mid-reasoning (missing </think> tag).")
                 usage = self._extract_usage(response, model, "completion")
 
                 return {
@@ -144,10 +144,10 @@ class LiteLLMClient(AbstractLLMClient):
                     api_key=self.api_key if self.api_key != "mock_key_for_testing" else None
                 )
                 raw_text = response.choices[0].message.content
-                if "<think" in raw_text and "</think>" not in raw_text:
-                    raise RuntimeError("Model output was truncated mid-reasoning (missing </think> tag).")
                 if "</think>" in raw_text:
                     raw_text = raw_text.split("</think>")[-1].strip()
+                if "<think" in raw_text:
+                    raise RuntimeError("Model output was truncated mid-reasoning (missing </think> tag).")
                 parsed_json = json.loads(raw_text)
                 validated_obj = response_model.model_validate(parsed_json)
                 usage = self._extract_usage(response, model, "structured_extraction")

@@ -43,13 +43,35 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
   const handleStartDiscovery = async () => {
     try {
       setDiscovering(true);
-      await triggerDiscovery();
-      alert("Discovery completed successfully!");
-      if (onIngestionCompleted) onIngestionCompleted(); // Refresh dashboard
+      const res = await triggerDiscovery();
+      const jobId = res.job_id;
+
+      const interval = setInterval(async () => {
+        try {
+          const statusRes = await fetchIngestionStatus(jobId);
+          setJobProgress(statusRes);
+
+          if (statusRes.status === 'COMPLETED' || statusRes.status === 'FAILED') {
+            clearInterval(interval);
+            setDiscovering(false);
+            setJobProgress(null);
+            if (onIngestionCompleted) onIngestionCompleted();
+            alert("Discovery and ingestion completed successfully!");
+          }
+        } catch (e) {
+          clearInterval(interval);
+          setDiscovering(false);
+          setJobProgress(null);
+        }
+      }, 2000);
+
     } catch (err) {
-      alert("Failed to run discovery: " + (err.response?.data?.detail || err.message));
-    } finally {
       setDiscovering(false);
+      if (err.response && err.response.status === 409) {
+        alert("A discovery or ingestion job is already running.");
+      } else {
+        alert("Failed to run discovery: " + (err.response?.data?.detail || err.message));
+      }
     }
   };
 
@@ -108,10 +130,12 @@ export default function Navbar({ activeTab, setActiveTab, onIngestionCompleted }
         </nav>
 
         <div className="flex items-center gap-3">
-          {jobProgress && ingesting && (
+          {jobProgress && (ingesting || discovering) && (
             <div className="text-xs text-indigo-300 bg-indigo-950/60 border border-indigo-800/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-              <span>Ingesting: {jobProgress.completed_documents} / {jobProgress.total_documents || '10'}</span>
+              <span>
+                {discovering ? 'Discovering & Ingesting' : 'Ingesting'}: {jobProgress.completed_documents} / {jobProgress.total_documents || '...'}
+              </span>
             </div>
           )}
 

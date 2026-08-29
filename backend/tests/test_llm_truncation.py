@@ -44,3 +44,19 @@ def test_truncation_all_fail():
     with patch('app.llm.client.litellm.completion', side_effect=mock_responses):
         with pytest.raises(RuntimeError, match="truncated mid-reasoning"):
             client.generate("Test prompt")
+
+def test_truncation_multi_block():
+    client = LiteLLMClient()
+    
+    mock_responses = [
+        MockResponse("<think> first block </think> actual output <think> second block cut off"),
+        MockResponse("<think> first block </think> actual output <think> second block cut off"),
+        MockResponse("<think> first block </think> actual output <think> second block cut off"),
+        MockResponse("<think> first block </think> actual output <think> second block cut off"),
+        MockResponse("<think> first block </think> actual output <think> second block cut off")
+    ]
+    
+    with patch('app.llm.client.litellm.completion', side_effect=mock_responses):
+        with pytest.raises(RuntimeError, match="truncated mid-reasoning"):
+            client.generate("Test prompt")
+

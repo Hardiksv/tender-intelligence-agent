@@ -154,21 +154,39 @@ async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):
     return await ingestion.trigger_ingestion_run(background_tasks, db=db)
 
 @app.post("/api/discover", tags=["Discovery"])
-async def trigger_discovery_api():
-    """Trigger the tender discovery cycle manually (synchronous for serverless)."""
+async def trigger_discovery_api(
+    background_tasks: BackgroundTasks,
+    db = Depends(get_db)
+):
+    """Trigger the tender discovery and ingestion cycle in the background."""
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-    from scripts.discover_tenders import run_discovery_cycle, CESLTenderSource
+    from app.db.models import IngestionJob, IngestionStatusEnum
+    from scripts.discover_tenders import run_discovery_and_ingest_job
     
     try:
-        sources = [CESLTenderSource()]
-        # Pass empty string since data_raw_dir is no longer used
-        run_discovery_cycle(sources, "")
-        return {"status": "success", "message": "Discovery cycle completed"}
+        active_job = db.query(IngestionJob).filter(IngestionJob.status == IngestionStatusEnum.RUNNING).first()
+        if active_job:
+            return JSONResponse(
+                status_code=409,
+                content={"detail": f"An ingestion or discovery job (ID: {active_job.id}) is already currently running."}
+            )
     except Exception as e:
-        logger.error(f"Discovery API failed: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.warning(f"Error querying active ingestion job: {e}")
+
+    job = IngestionJob(
+        status=IngestionStatusEnum.PENDING,
+        total_documents=0,
+        completed_documents=0,
+        failed_documents=0
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    background_tasks.add_task(run_discovery_and_ingest_job, str(job.id))
+    return {"job_id": str(job.id), "status": "PENDING"}
 
 @app.get("/api/debug-routing", tags=["Debug"])
 async def debug_routing(request: Request):
