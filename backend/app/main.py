@@ -21,7 +21,6 @@ from app.db.database import get_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup and shutdown."""
     logger.info("Tender Intelligence API started.")
     try:
         from app.db.database import SessionLocal
@@ -29,18 +28,14 @@ async def lifespan(app: FastAPI):
         db = SessionLocal()
         tender_count = db.query(Tender).filter(Tender.is_active == True).count()
         doc_count = db.query(Document).count()
-        
-        logger.info(f"STARTUP DB HEALTH CHECK: {tender_count} Active Tenders, {doc_count} DB Documents")
+        logger.info(f"Startup check: {tender_count} active tenders, {doc_count} documents.")
         db.close()
-        
         from app.core.config import settings
         if settings.DISCOVERY_ENABLED:
-            logger.info("Starting background tender discovery scheduler...")
             from app.services.discover_tenders import start_discovery_scheduler
             start_discovery_scheduler(interval_minutes=60)
-            
     except Exception as e:
-        logger.error(f"STARTUP DB HEALTH CHECK FAILED: {e}")
+        logger.error(f"Startup DB check failed: {e}")
     yield
     logger.info("Tender Intelligence API stopped.")
 
@@ -100,25 +95,9 @@ app.include_router(profile.router)
 app.include_router(chat.router)
 app.include_router(ingestion.router)
 
-@app.get("/", tags=["Root"])
-@app.get("/api", tags=["Root"])
-@app.get("/api/", tags=["Root"])
-async def root_index():
-    """Root status endpoint."""
-    return {
-        "status": "online",
-        "app": "Tender Intelligence Agent API",
-        "version": "1.0.0",
-        "docs_url": "/docs",
-        "api_docs_url": "/api/docs",
-        "health_url": "/health",
-        "api_health_url": "/api/health"
-    }
-
 @app.get("/health", tags=["Health"])
 @app.get("/api/health", tags=["Health"])
 async def health_check():
-    """Basic health check endpoint."""
     return {
         "status": "healthy",
         "app": "Tender Intelligence Agent",
@@ -158,13 +137,9 @@ async def trigger_discovery_api(
     background_tasks: BackgroundTasks,
     db = Depends(get_db)
 ):
-    """Trigger the tender discovery and ingestion cycle in the background."""
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     from app.db.models import IngestionJob, IngestionStatusEnum
     from app.services.discover_tenders import run_discovery_and_ingest_job
-    
+
     try:
         active_job = db.query(IngestionJob).filter(IngestionJob.status == IngestionStatusEnum.RUNNING).first()
         if active_job:
@@ -187,18 +162,6 @@ async def trigger_discovery_api(
 
     background_tasks.add_task(run_discovery_and_ingest_job, str(job.id))
     return {"job_id": str(job.id), "status": "PENDING"}
-
-@app.get("/api/debug-routing", tags=["Debug"])
-async def debug_routing(request: Request):
-    """Debug endpoint to inspect exact ASGI path and headers received from Vercel."""
-    return {
-        "url_path": request.url.path,
-        "scope_path": request.scope.get("path"),
-        "scope_raw_path": request.scope.get("raw_path", b"").decode("utf-8", errors="replace"),
-        "query_string": request.scope.get("query_string", b"").decode("utf-8", errors="replace"),
-        "headers": {k.decode("utf-8", errors="replace"): v.decode("utf-8", errors="replace") for k, v in request.scope.get("headers", [])}
-    }
-
 
 
 if __name__ == "__main__":
