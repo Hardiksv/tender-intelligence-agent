@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
         from app.core.config import settings
         if settings.DISCOVERY_ENABLED:
             logger.info("Starting background tender discovery scheduler...")
-            from scripts.discover_tenders import start_discovery_scheduler
+            from app.services.discover_tenders import start_discovery_scheduler
             start_discovery_scheduler(interval_minutes=60)
             
     except Exception as e:
@@ -163,7 +163,7 @@ async def trigger_discovery_api(
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     from app.db.models import IngestionJob, IngestionStatusEnum
-    from scripts.discover_tenders import run_discovery_and_ingest_job
+    from app.services.discover_tenders import run_discovery_and_ingest_job
     
     try:
         active_job = db.query(IngestionJob).filter(IngestionJob.status == IngestionStatusEnum.RUNNING).first()
