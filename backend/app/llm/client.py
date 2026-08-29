@@ -49,7 +49,7 @@ class LiteLLMClient(AbstractLLMClient):
         prompt: str,
         system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: int = 3000
+        max_tokens: int = 8192
     ) -> dict[str, Any]:
         messages = []
         if system_prompt:
@@ -113,7 +113,7 @@ class LiteLLMClient(AbstractLLMClient):
         response_model: type[T],
         system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: int = 3000
+        max_tokens: int = 8192
     ) -> dict[str, Any]:
         messages = []
         if system_prompt:
