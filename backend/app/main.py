@@ -199,30 +199,7 @@ async def debug_routing(request: Request):
         "headers": {k.decode("utf-8", errors="replace"): v.decode("utf-8", errors="replace") for k, v in request.scope.get("headers", [])}
     }
 
-@app.get("/api/debug-import", tags=["Debug"])
-async def debug_import():
-    try:
-        import sys
-        import os
-        import importlib
-        
-        info = {
-            "cwd": os.getcwd(),
-            "sys_path": sys.path,
-            "files_in_services": os.listdir(os.path.join(os.path.dirname(__file__), "services")) if os.path.exists(os.path.join(os.path.dirname(__file__), "services")) else "no services dir"
-        }
-        
-        try:
-            from app.services import discover_tenders
-            info["import_discover_tenders"] = "SUCCESS"
-        except Exception as e:
-            import traceback
-            info["import_discover_tenders"] = f"FAILED: {e}"
-            info["import_traceback"] = traceback.format_exc()
-            
-        return info
-    except Exception as e:
-        return {"error": str(e)}
+
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
