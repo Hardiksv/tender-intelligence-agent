@@ -1,19 +1,19 @@
-"""
-test_pipeline_orchestration.py  (v2 — all failures fixed)
+﻿"""
+test_pipeline_orchestration.py  (v2 â€” all failures fixed)
 -----------------------------------------------------------
-Tests for the wired ingestion → extraction → screening agent loop.
+Tests for the wired ingestion â†’ extraction â†’ screening agent loop.
 Covers:
   - extraction is called from pipeline
   - screening is called after extraction
   - extraction failure handled via heuristic fallback
   - screening gracefully handles empty/zero-criteria eligibility
-  - end-to-end extracted eligibility → screening verdict
+  - end-to-end extracted eligibility â†’ screening verdict
   - idempotency: re-running pipeline does NOT duplicate eligibility/screening rows
 
 FIX LOG:
   test 1 & 2: Must also patch app.agent.pipeline.CATALOG so the fake PDF filename
                is recognised (not silently skipped as "not in catalog").
-  test 3:      Empty preferred_geographies + non-empty state → geography criterion
+  test 3:      Empty preferred_geographies + non-empty state â†’ geography criterion
                correctly fires as REVIEW (not GO). Assert REVIEW.
   test 4 & 5:  submission_deadline must be a Python datetime, not an ISO string,
                for SQLite DateTime column.
@@ -300,8 +300,8 @@ def test_screening_service_handles_empty_eligibility_as_review():
     """
     FIXED ASSERTION: screen_tender_eligibility() with all-None eligibility criteria
     and a non-empty tender_state fires ONLY the geography check.
-    Since preferred_geographies=[] → state NOT found → criterion = REVIEW.
-    No mandatory failures → final verdict = REVIEW (correct behaviour).
+    Since preferred_geographies=[] â†’ state NOT found â†’ criterion = REVIEW.
+    No mandatory failures â†’ final verdict = REVIEW (correct behaviour).
     """
     from app.services.screening import screen_tender_eligibility
     from app.schemas.profile import CompanyProfileBase
@@ -324,7 +324,7 @@ def test_screening_service_handles_empty_eligibility_as_review():
 def test_screening_service_go_when_no_state():
     """
     When tender_state is empty AND all eligibility criteria are None,
-    no criteria fire at all → verdict = GO.
+    no criteria fire at all â†’ verdict = GO.
     """
     from app.services.screening import screen_tender_eligibility
     from app.schemas.profile import CompanyProfileBase
@@ -346,8 +346,8 @@ def test_screening_service_go_when_no_state():
 
 def test_e2e_extracted_elig_to_screening_verdict():
     """
-    Full chain test: simulate extracted eligibility data → pass to screening
-    → verify correct GO/NO-GO/REVIEW verdict.
+    Full chain test: simulate extracted eligibility data â†’ pass to screening
+    â†’ verify correct GO/NO-GO/REVIEW verdict.
     Mirrors exactly what the pipeline does after a document is extracted.
     """
     from app.services.screening import screen_tender_eligibility
@@ -390,7 +390,7 @@ def test_e2e_extracted_elig_to_screening_verdict():
 def test_idempotency_no_duplicate_eligibility_records(test_db):
     """
     Verifies that running the pipeline twice for the same tender does NOT
-    create a second TenderEligibility record — pipeline checks for existing
+    create a second TenderEligibility record â€” pipeline checks for existing
     record and updates rather than inserting a new one.
 
     FIX: Pass datetime objects (not ISO strings) for all DateTime columns.
@@ -527,11 +527,11 @@ from app.agent.pipeline import run_ingestion_pipeline
 def test_deadline_merge_order_independence_integration(test_db):
     from app.db.models import Tender, IngestionJob, IngestionStatusEnum
     from app.agent.pipeline import run_ingestion_pipeline
-    import tempfile, os, json
-    from datetime import datetime, timezone
-    from unittest.mock import patch
-    
-    # Create fake amendment PDFs with valid headers
+    import tempfile, os
+    from datetime import datetime
+    from unittest.mock import patch, MagicMock
+    from sqlalchemy.orm import sessionmaker
+
     pdf1 = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
     pdf2 = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
     parent_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
@@ -541,11 +541,11 @@ def test_deadline_merge_order_independence_integration(test_db):
     pdf1.close()
     pdf2.close()
     parent_pdf.close()
-    
+
     job = IngestionJob(status=IngestionStatusEnum.PENDING)
     test_db.add(job)
     test_db.commit()
-    
+
     meta2 = {
         'tender_ref': 'TEST_DEADLINE_MERGE',
         'is_parent': False,
@@ -577,7 +577,7 @@ def test_deadline_merge_order_independence_integration(test_db):
         os.path.basename(pdf1.name): meta1,
         os.path.basename(parent_pdf.name): meta_parent
     }
-    
+
     mock_parsed_doc = {
         'document_hash': 'amendhash',
         'full_text': 'test text',
@@ -585,44 +585,47 @@ def test_deadline_merge_order_independence_integration(test_db):
         'detected_language': 'en',
         'pages': []
     }
-    
-    # We need a factory that returns a fresh session bound to the same engine
-    from sqlalchemy.orm import sessionmaker
+
     TestSession = sessionmaker(bind=test_db.get_bind())
-    
-    # Run the real pipeline function. Process parent first.
-    with patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
-         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
-        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name], custom_meta=catalog)
-        
-    tender = test_db.query(Tender).filter(Tender.tender_ref=='TEST_DEADLINE_MERGE').first()
-    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-10-01T15:00:00').replace(tzinfo=None)
 
-    # Process Amendment 2 (later deadline)
+    mock_extract = {
+        'extraction': MagicMock(
+            title='Parent',
+            issuing_authority='Test Auth',
+            city='Test City',
+            state='Test State',
+            submission_deadline='2026-10-01T15:00:00+00:00',
+            emd_amount=1000.0,
+            emd_breakdown={},
+            document_fee=0.0,
+            scope_summary='Test',
+            eligibility=MagicMock(other_requirements=[], minimum_fleet_size=10, minimum_annual_turnover=100.0, minimum_experience_years=1, minimum_past_contract_value=10.0, minimum_depots_required=1, required_geographies=[])
+        ),
+        'usage': {},
+        'model': 'mock'
+    }
+
     with patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
-         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
+         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc), \
+         patch('app.agent.pipeline.extract_tender_structured_data', return_value=mock_extract), \
+         patch('app.agent.pipeline.generate_embeddings_batch', return_value=[]), \
+         patch('app.agent.pipeline.screen_tender_eligibility', return_value=MagicMock(verdict=MagicMock(value='GO'), reasoning='Mocked reasoning', criteria_results=[])):
+
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name], custom_meta=catalog)
+        tender = test_db.query(Tender).filter(Tender.tender_ref=='TEST_DEADLINE_MERGE').first()
+        assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-10-01T15:00:00').replace(tzinfo=None)
+
         run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf2.name], custom_meta=catalog)
-        
-    test_db.refresh(tender)
-    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
-    
-    # Process Amendment 1 (earlier deadline)
-    with patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
-         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
-        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf1.name], custom_meta=catalog)
-        
-    test_db.refresh(tender)
-    # Deadline should NOT be overwritten by the earlier amendment
-    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
+        test_db.refresh(tender)
+        assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
 
-    # Re-process Parent PDF (testing the regression case)
-    with patch('app.agent.pipeline.SessionLocal', side_effect=TestSession), \
-         patch('app.agent.pipeline.parse_pdf_document', return_value=mock_parsed_doc):
+        run_ingestion_pipeline(str(job.id), custom_pdf_paths=[pdf1.name], custom_meta=catalog)
+        test_db.refresh(tender)
+        assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
+
         run_ingestion_pipeline(str(job.id), custom_pdf_paths=[parent_pdf.name], custom_meta=catalog)
-        
-    test_db.refresh(tender)
-    # Deadline should NOT be overwritten by the parent
-    assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
+        test_db.refresh(tender)
+        assert tender.submission_deadline.replace(tzinfo=None) == datetime.fromisoformat('2026-12-01T15:00:00').replace(tzinfo=None)
 
 def test_deadline_merge_order_independence_direct(test_db):
     from app.db.models import Tender

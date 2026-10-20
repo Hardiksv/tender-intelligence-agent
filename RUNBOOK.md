@@ -1,4 +1,4 @@
-# RUNBOOK.md — Tender Intelligence Agent Operations Guide
+﻿# RUNBOOK.md â€” Tender Intelligence Agent Operations Guide
 
 ---
 
@@ -7,7 +7,7 @@
 ### Supported Environments
 - **Primary Development OS:** Windows 10/11 (CMD & PowerShell) `[VERIFIED]`
 - **Alternative OS:** Linux / macOS (Bash / Zsh) `[VERIFIED]`
-- **Runtime:** Python 3.11 – 3.13 `[VERIFIED]` (Validated on Python 3.13.5)
+- **Runtime:** Python 3.11 â€“ 3.13 `[VERIFIED]` (Validated on Python 3.13.5)
 - **Node.js:** Node.js 18+ and npm 9+ (for React frontend) `[VERIFIED]`
 - **Primary Database:** PostgreSQL 16 with `pgvector` extension `[VERIFIED]`
 - **Automatic Fallback Database:** SQLite 3 (`tender_intelligence.db`) `[VERIFIED]`
@@ -23,7 +23,7 @@ The application loads environment variables dynamically via `pydantic-settings` 
 | `DATABASE_URL` | `[CONFIGURATION REQUIRED]` | `sqlite:///tender_intelligence.db` | `[VERIFIED]` | PostgreSQL connection URI (`postgresql://...`). If unreachable or omitted, engine falls back to local SQLite (`tender_intelligence.db`). |
 | `LLM_API_KEY` | `[CONFIGURATION REQUIRED]` | `""` | `[VERIFIED]` | Gemini API Key (e.g. `gsk_...`) or LiteLLM provider key. Used for structured extraction and RAG response synthesis. |
 | `LLM_MODEL` | `[OPTIONAL]` | `gemini/gemini-flash-latest` | `[VERIFIED]` | Primary model for extraction and Q&A. |
-| `LLM_FALLBACK_MODEL` | `[OPTIONAL]` | `gemini/gemini-3.5-flash` | `[VERIFIED]` | Automatic fallback model triggered if primary model encounters rate limits or errors. |
+| `LLM_FALLBACK_MODEL` | `[OPTIONAL]` | `gemini/gemini-2.0-flash` | `[VERIFIED]` | Automatic fallback model triggered if primary model encounters rate limits or errors. |
 | `EMBEDDING_API_KEY` | `[CONFIGURATION REQUIRED]` | `""` | `[VERIFIED]` | Jina AI API key (`jina_...`) for 768-dim embeddings. |
 | `EMBEDDING_MODEL` | `[OPTIONAL]` | `jina-embeddings-v5-omni-small` | `[VERIFIED]` | Embedding model name. |
 | `EMBEDDING_DIMENSION` | `[OPTIONAL]` | `768` | `[VERIFIED]` | Target vector dimensionality (must match database vector column). |
@@ -353,7 +353,7 @@ Expected Response (`HTTP 409 Conflict`):
   ```json
   {
     "question": "What is the EMD requirement for CESL PM-eBus Sewa Tender 3?",
-    "answer": "The Earnest Money Deposit (EMD) for PM-eBus Sewa Tender 3 is structured lot-wise with a cumulative total of ₹113.10 Crore across 19 lots...",
+    "answer": "The Earnest Money Deposit (EMD) for PM-eBus Sewa Tender 3 is structured lot-wise with a cumulative total of â‚¹113.10 Crore across 19 lots...",
     "citations": [
       {
         "tender_id": "c1f76d91-5b23-4e4b-b0b2-32b04f7a29e1",
@@ -383,9 +383,9 @@ Expected Response (`HTTP 409 Conflict`):
 The MCP Server exposes the tender intelligence capabilities to LLM clients (such as Claude Desktop or custom agents) over stdio.
 
 ### 8.1 Implemented MCP Tools
-1. `search_tenders(query, state, city, verdict)` — Searches tenders by keyword, state, city, or screening verdict.
-2. `get_tender(tender_id)` — Fetches comprehensive tender details, eligibility criteria, and screening verdicts.
-3. `ask_tenders(question, tender_id)` — Performs grounded RAG Q&A with provenance citations.
+1. `search_tenders(query, state, city, verdict)` â€” Searches tenders by keyword, state, city, or screening verdict.
+2. `get_tender(tender_id)` â€” Fetches comprehensive tender details, eligibility criteria, and screening verdicts.
+3. `ask_tenders(question, tender_id)` â€” Performs grounded RAG Q&A with provenance citations.
 
 ### 8.2 Testing MCP Server Locally `[VERIFIED]`
 
@@ -479,7 +479,7 @@ tests/test_screening.py::test_mandatory_fail_gives_nogo PASSED           [ 61%]
 tests/test_screening.py::test_mandatory_fail_plus_review_gives_nogo_precedence PASSED [ 62%]
 tests/test_screening.py::test_all_mandatory_pass_plus_review_gives_review PASSED [ 64%]
 
-============================= 59 passed in 48.15s =============================
+============================= 51 passed in 48.15s =============================
 ```
 
 ---
@@ -511,7 +511,7 @@ python scripts/e2e_playwright_test.py
 
 ### 10.3 Gemini API Rate Limiting / 429 Error `[VERIFIED]`
 - **Symptom:** Primary model returns `429 Too Many Requests`.
-- **Automatic Fallback:** The backend caught exception automatically and executes request via fallback model `gemini/gemini-3.5-flash`.
+- **Automatic Fallback:** The backend caught exception automatically and executes request via fallback model `gemini/gemini-2.0-flash`.
 - **Fix:** If both providers fail, verify `LLM_API_KEY` quota at `aistudio.google.com`.
 
 ---

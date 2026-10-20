@@ -1,6 +1,6 @@
-import glob
+﻿import glob
 import os
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -27,6 +27,7 @@ from app.services.screening import screen_tender_eligibility
 SEED_DATA_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "raw")
 )
+
 
 def get_or_create_default_profile(db: Session) -> CompanyProfile:
     profile = db.query(CompanyProfile).first()
@@ -60,8 +61,11 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
 
         log_action("INGESTION_STARTED", job_id=job_id, status="RUNNING")
 
-        pdf_files = custom_pdf_paths if custom_pdf_paths else []
-        
+        if custom_pdf_paths is not None:
+            pdf_files = custom_pdf_paths
+        else:
+            pdf_files = sorted(glob.glob(os.path.join(SEED_DATA_DIR, "*.pdf")))
+
         job.total_documents = len(pdf_files)
         db.commit()
 
@@ -74,14 +78,30 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
             if custom_meta and file_name in custom_meta:
                 meta = custom_meta[file_name]
 
+            parsed_doc = None
             if not meta:
-                logger.warning(f"File {file_name} has no provided metadata. Skipping.")
-                job.failed_documents += 1
-                db.commit()
-                continue
+                try:
+                    parsed_doc = parse_pdf_document(pdf_path)
+                    doc_hash = parsed_doc["document_hash"]
+                except Exception as parse_err:
+                    logger.error(f"Failed to parse {file_name}: {parse_err}")
+                    job.failed_documents += 1
+                    db.commit()
+                    continue
+
+                meta = {
+                    "tender_ref": f"REF-{doc_hash[:8].upper()}",
+                    "is_parent": True,
+                    "document_type": "ORIGINAL_RFP",
+                    "title": os.path.splitext(file_name)[0].replace("_", " ").title(),
+                    "issuing_authority": "Public Procurement Authority",
+                    "submission_deadline": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
+                    "source_url": ""
+                }
 
             try:
-                parsed_doc = parse_pdf_document(pdf_path)
+                if parsed_doc is None:
+                    parsed_doc = parse_pdf_document(pdf_path)
 
                 tender_ref = meta["tender_ref"]
                 tender = db.query(Tender).filter(Tender.tender_ref == tender_ref).first()
@@ -89,7 +109,7 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                 if not tender:
                     parent_meta = meta
                     if not meta["is_parent"]:
-                        for mdata in custom_meta.values() if custom_meta else []:
+                        for mdata in (custom_meta.values() if custom_meta else []):
                             if mdata.get("tender_ref") == tender_ref and mdata.get("is_parent"):
                                 parent_meta = mdata
                                 break
@@ -143,11 +163,17 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                     if meta["is_parent"]:
                         parent_meta = meta
                         deadline_dt = datetime.fromisoformat(parent_meta["submission_deadline"])
-                        tender.original_deadline = deadline_dt
-                        if not tender.submission_deadline or deadline_dt > tender.submission_deadline.replace(tzinfo=deadline_dt.tzinfo):
+                        curr_dl = tender.submission_deadline
+                        curr_dl_tz = curr_dl.replace(tzinfo=deadline_dt.tzinfo) if (curr_dl and curr_dl.tzinfo is None) else curr_dl
+                        if curr_dl_tz is None or (not (tender.latest_deadline_source and any(k in tender.latest_deadline_source.lower() for k in ["amendment", "corrigendum"])) and deadline_dt > curr_dl_tz):
                             tender.submission_deadline = deadline_dt
                             tender.latest_deadline = deadline_dt
-                            tender.latest_deadline_source = parent_meta.get("latest_deadline_source")
+                            tender.latest_deadline_source = parent_meta.get("latest_deadline_source", "Portal RFP")
+                        tender.city = parent_meta.get("city")
+                        tender.state = parent_meta.get("state")
+                        tender.original_bus_quantity = parent_meta.get("original_bus_quantity")
+                        tender.latest_bus_quantity = parent_meta.get("latest_bus_quantity")
+                        tender.latest_quantity_source = parent_meta.get("latest_quantity_source")
                         tender.emd_amount = parent_meta.get("emd_amount")
                         tender.original_emd_amount = parent_meta.get("emd_amount")
                         tender.latest_emd_amount = parent_meta.get("emd_amount")
@@ -178,15 +204,16 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
 
                     if "latest_submission_deadline" in meta and not meta["is_parent"]:
                         deadline_dt = datetime.fromisoformat(meta["latest_submission_deadline"])
-                        # Make deadline-merge order-independent: only update if the new date is strictly later
-                        if not tender.submission_deadline or deadline_dt > tender.submission_deadline.replace(tzinfo=deadline_dt.tzinfo):
+                        curr_dl = tender.submission_deadline
+                        curr_dl_tz = curr_dl.replace(tzinfo=deadline_dt.tzinfo) if (curr_dl and curr_dl.tzinfo is None) else curr_dl
+                        if curr_dl_tz is None or deadline_dt > curr_dl_tz:
                             tender.submission_deadline = deadline_dt
                             tender.latest_deadline = deadline_dt
-                            tender.latest_deadline_source = meta.get("latest_deadline_source", meta.get("amendment_number"))
+                            tender.latest_deadline_source = meta.get("latest_deadline_source", meta.get("amendment_number", "Corrigendum"))
                             db.flush()
                             logger.info(f"Updated Parent Tender {tender_ref} with latest deadline {deadline_dt} from {file_name}")
                         else:
-                            logger.info(f"Ignored earlier deadline {deadline_dt} from {file_name} (current is {tender.submission_deadline})")
+                            logger.info(f"Deadline {deadline_dt} from {file_name} matches current deadline ({tender.submission_deadline})")
 
                 existing_doc = db.query(Document).filter(Document.document_hash == parsed_doc["document_hash"]).first()
                 if existing_doc:
@@ -227,7 +254,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                                 eligibility=extracted_elig,
                                 profile=profile_base
                             )
-                            # UPSERT: delete any existing rows then insert fresh one
                             db.query(ScreeningResult).filter(
                                 ScreeningResult.tender_id == tender.id
                             ).delete(synchronize_session=False)
@@ -328,8 +354,6 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = Non
                     profile=profile_base
                 )
 
-                # UPSERT screening: delete any existing row for this tender before inserting new one.
-                # This prevents the class of bug where re-running ingestion creates duplicate rows.
                 db.query(ScreeningResult).filter(
                     ScreeningResult.tender_id == tender.id
                 ).delete(synchronize_session=False)

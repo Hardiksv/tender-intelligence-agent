@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -22,60 +22,20 @@ async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):
     except Exception:
         t = None
 
-    if t:
-        latest_s = db.query(ScreeningResult).filter(ScreeningResult.tender_id == tender_id).order_by(ScreeningResult.screened_at.desc()).first()
-        if latest_s:
-            return ScreeningResultSchema(
-                tender_id=str(t.id),
-                verdict=FinalVerdict(latest_s.verdict),
-                reasoning=latest_s.reasoning,
-                criteria_results=latest_s.criteria_results,
-                screened_at=latest_s.screened_at.isoformat()
-            )
+    if not t:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tender not found")
 
-    import uuid
+    latest_s = db.query(ScreeningResult).filter(ScreeningResult.tender_id == tender_id).order_by(ScreeningResult.screened_at.desc()).first()
+    if latest_s:
+        return ScreeningResultSchema(
+            tender_id=str(t.id),
+            verdict=FinalVerdict(latest_s.verdict),
+            reasoning=latest_s.reasoning,
+            criteria_results=latest_s.criteria_results,
+            screened_at=latest_s.screened_at.isoformat()
+        )
 
-    from app.agent.pipeline import CATALOG
-    from app.schemas.extraction import TenderEligibilitySchema
-    from app.schemas.profile import CompanyProfileBase
-    from app.services.screening import screen_tender_eligibility
-
-    for meta in CATALOG.values():
-        if not meta.get("is_parent"):
-            continue
-        gen_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
-        if gen_id == str(tender_id) or str(tender_id) in meta["tender_ref"]:
-            profile_base = CompanyProfileBase(
-                fleet_size=120,
-                annual_turnover=150000000.0,
-                years_experience=7,
-                past_contract_sizes=[75000000.0, 90000000.0],
-                preferred_geographies=["Rajasthan", "Haryana", "Delhi", "Gujarat"]
-            )
-            elig_schema = TenderEligibilitySchema(
-                minimum_fleet_size=80,
-                minimum_annual_turnover=100000000.0,
-                minimum_experience_years=5,
-                minimum_past_contract_value=50000000.0,
-                required_geographies=[meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"],
-                other_requirements=[]
-            )
-            s_res = screen_tender_eligibility(
-                tender_id=str(tender_id),
-                tender_title=meta["title"],
-                tender_state=meta.get("state"),
-                eligibility=elig_schema,
-                profile=profile_base
-            )
-            return ScreeningResultSchema(
-                tender_id=str(tender_id),
-                verdict=s_res.verdict,
-                reasoning=s_res.reasoning,
-                criteria_results=[c.model_dump() for c in s_res.criteria_results],
-                screened_at=datetime.now(UTC).isoformat()
-            )
-
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tender not found")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tender has not been screened yet")
 
 
 @router.post("/{tender_id}/screen", response_model=ScreeningResultSchema)

@@ -1,18 +1,33 @@
-import pytest
-from app.core.config import settings
-from app.services.embeddings import generate_embedding, generate_embeddings_batch
-from app.db.models import DocumentChunk, Tender, Document
 import uuid
 from datetime import datetime, timezone
+from unittest.mock import patch
+
+import pytest
+
+from app.core.config import settings
+from app.db.models import Document, DocumentChunk, Tender
+from app.services.embeddings import generate_embedding, generate_embeddings_batch
+
+
+@pytest.fixture(autouse=True)
+def mock_jina_embedding_api():
+    """Mocks Jina API to return valid 768-dim embeddings offline."""
+    def fake_jina(texts, task_type="retrieval.passage"):
+        return [[0.05] * settings.EMBEDDING_DIMENSION for _ in texts]
+
+    with patch("app.services.embeddings._call_jina_api", side_effect=fake_jina):
+        yield
+
 
 def test_gemini_embedding_dimension_768():
     """Smoke test asserting generated embedding vector length is exactly 768 dimensions."""
     sample_text = "Selection of Bus Operator for Procurement and Operation of 3,604 Electric Buses under PM-eBus Sewa."
     vec = generate_embedding(sample_text)
-    
+
     assert isinstance(vec, list)
     assert len(vec) == settings.EMBEDDING_DIMENSION
     assert len(vec) == 768
+
 
 def test_gemini_batch_embedding_dimension_768():
     """Smoke test asserting batch embedding vectors are all exactly 768 dimensions."""
@@ -21,20 +36,17 @@ def test_gemini_batch_embedding_dimension_768():
         "Second chunk: Financial criteria requires minimum annual turnover of INR 100 Crore."
     ]
     batch_vecs = generate_embeddings_batch(samples)
-    
+
     assert len(batch_vecs) == 2
     for v in batch_vecs:
         assert len(v) == settings.EMBEDDING_DIMENSION
         assert len(v) == 768
 
+
 def test_document_chunk_db_insertion(test_db):
     """
     Test creating and inserting a DocumentChunk with a 768-dim vector.
-
-    Uses the `test_db` fixture (conftest.py) which runs against an isolated
-    SQLite DB and NEVER commits to the live Neon production database.
-    The SAVEPOINT pattern in conftest guarantees all writes are rolled back
-    after this test exits — no garbage rows in production, ever.
+    Runs against isolated SQLite test DB and verifies retrieval.
     """
     t_id = uuid.uuid4()
     t = Tender(
@@ -80,5 +92,3 @@ def test_document_chunk_db_insertion(test_db):
     retrieved = test_db.query(DocumentChunk).filter(DocumentChunk.id == chunk.id).first()
     assert retrieved is not None
     assert len(retrieved.embedding) == 768
-    # No db.commit() — the conftest fixture rolls back the SAVEPOINT after this test
-

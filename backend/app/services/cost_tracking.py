@@ -1,4 +1,4 @@
-from typing import Any
+﻿from typing import Any
 import litellm
 
 USD_TO_INR = 85.0
@@ -27,12 +27,10 @@ def calculate_llm_cost(usage: dict[str, Any]) -> dict[str, Any]:
     model = usage.get("model", "")
 
     try:
-        # returns (prompt_cost, completion_cost)
         prompt_cost, comp_cost = litellm.cost_per_token(model, prompt_tokens, completion_tokens)
         total_cost_usd = prompt_cost + comp_cost
         pricing_source = f"LiteLLM Cost Map ({model})"
     except Exception:
-        # Fallback if model not in litellm's pricing map
         fallback_rates = {
             "groq/openai/gpt-oss-120b": {"p": 0.0015, "c": 0.002},
             "groq/qwen/qwen3.6-27b": {"p": 0.0005, "c": 0.001}

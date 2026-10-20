@@ -24,13 +24,12 @@ async def lifespan(app: FastAPI):
     logger.info("Tender Intelligence API started.")
     try:
         from app.db.database import SessionLocal
-        from app.db.models import Tender, Document
+        from app.db.models import Document, Tender
         db = SessionLocal()
         tender_count = db.query(Tender).filter(Tender.is_active == True).count()
         doc_count = db.query(Document).count()
         logger.info(f"Startup check: {tender_count} active tenders, {doc_count} documents.")
         db.close()
-        from app.core.config import settings
         if settings.DISCOVERY_ENABLED:
             from app.services.discover_tenders import start_discovery_scheduler
             start_discovery_scheduler(interval_minutes=60)
@@ -39,6 +38,7 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Tender Intelligence API stopped.")
 
+
 app = FastAPI(
     title="Tender Intelligence Agent API",
     description="Production-grade AI pipeline for public Bus Operations tender analysis, screening, and RAG Q&A",
@@ -46,10 +46,19 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Secure CORS: specify allowed origins rather than wildcard with credentials
+allowed_origins = [settings.FRONTEND_ORIGIN]
+for origin in [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://tender-intelligence-agen.vercel.app"
+]:
+    if origin not in allowed_origins:
+        allowed_origins.append(origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_origin_regex=r".*",
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,6 +104,7 @@ app.include_router(profile.router)
 app.include_router(chat.router)
 app.include_router(ingestion.router)
 
+
 @app.get("/health", tags=["Health"])
 @app.get("/api/health", tags=["Health"])
 async def health_check():
@@ -105,6 +115,7 @@ async def health_check():
         "timezone": settings.TIMEZONE
     }
 
+
 @app.get("/api/docs", include_in_schema=False)
 async def api_docs():
     return get_swagger_ui_html(
@@ -112,30 +123,36 @@ async def api_docs():
         title="Tender Intelligence Agent - API Docs"
     )
 
+
 @app.get("/api/openapi.json", include_in_schema=False)
 async def api_openapi():
     return JSONResponse(get_openapi(title=app.title, version=app.version, routes=app.routes))
 
+
 @app.get("/tenders", tags=["Tenders Alias"])
-async def list_tenders_alias(db = Depends(get_db)):
+async def list_tenders_alias(db=Depends(get_db)):
     return await tenders.list_tenders(db=db)
 
+
 @app.post("/ask", tags=["RAG Alias"])
-async def ask_alias(req: chat.ChatRequest, db = Depends(get_db)):
+async def ask_alias(req: chat.ChatRequest, db=Depends(get_db)):
     return await chat.chat_qna(req, db=db)
+
 
 @app.post("/search", tags=["Search Alias"])
-async def search_alias(req: chat.ChatRequest, db = Depends(get_db)):
+async def search_alias(req: chat.ChatRequest, db=Depends(get_db)):
     return await chat.chat_qna(req, db=db)
 
+
 @app.post("/ingest", tags=["Ingestion Alias"])
-async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):
+async def ingest_alias(background_tasks: BackgroundTasks, db=Depends(get_db)):
     return await ingestion.trigger_ingestion_run(background_tasks, db=db)
 
-@app.post("/api/discover", tags=["Discovery"])
+
+@app.api_route("/api/discover", methods=["GET", "POST"], tags=["Discovery"])
 async def trigger_discovery_api(
     background_tasks: BackgroundTasks,
-    db = Depends(get_db)
+    db=Depends(get_db)
 ):
     from app.db.models import IngestionJob, IngestionStatusEnum
     from app.services.discover_tenders import run_discovery_and_ingest_job

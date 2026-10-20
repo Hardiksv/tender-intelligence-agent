@@ -1,9 +1,11 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
+from app.core.config import settings
+from app.core.exceptions import EmbeddingDimensionMismatchException
 from app.services.chunking import chunk_document_pages
 from app.services.embeddings import generate_embedding
-from app.core.exceptions import EmbeddingDimensionMismatchException
-from app.core.config import settings
 
 
 def test_chunking_page_awareness():
@@ -19,7 +21,11 @@ def test_chunking_page_awareness():
     assert chunks[1]["page_number"] == 2
 
 
-def test_embedding_generation_dimension():
+def test_embedding_generation_dimension(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.embeddings._call_jina_api",
+        lambda texts, **kw: [[0.05] * settings.EMBEDDING_DIMENSION for _ in texts]
+    )
     vec = generate_embedding("Sample tender requirement for bus fleet size")
     assert len(vec) == settings.EMBEDDING_DIMENSION
 

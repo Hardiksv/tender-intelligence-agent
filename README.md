@@ -6,8 +6,8 @@ A production-grade AI platform that automatically discovers, ingests, screens, a
 
 ## What It Does
 
-1. **Discovers** tenders automatically from public government portals (CESL Convergence)
-2. **Ingests** PDFs through a full AI pipeline: parse → extract → chunk → embed → store
+1. **Discovers** tenders automatically from public government portals ([CESL Convergence](https://www.convergence.co.in/tender))
+2. **Ingests** PDFs through a full AI pipeline: parse -> extract -> chunk -> embed -> store
 3. **Screens** each tender with a deterministic GO / REVIEW / NO-GO engine against company eligibility criteria
 4. **Answers** questions via a Grounded RAG chat with exact page-level citations from the source PDFs
 
@@ -20,7 +20,7 @@ React + Vite (Frontend)
         |
 FastAPI (Python Backend)
         |
-Pipeline: PyMuPDF → LiteLLM (Gemini) → Semantic Chunking → Jina Embeddings
+Pipeline: PyMuPDF -> LiteLLM (Gemini) -> Semantic Chunking -> Jina Embeddings
         |
 PostgreSQL + pgvector (Neon DB)
         |
@@ -56,6 +56,7 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/tender_db
 LLM_API_KEY=your_gemini_api_key_here
 LLM_MODEL=gemini/gemini-flash-latest
 EMBEDDING_API_KEY=your_jina_api_key_here
+EMBEDDING_MODEL=jina-embeddings-v5-omni-small
 ```
 
 ### 2. Run with Docker (Recommended)
@@ -106,91 +107,80 @@ Open http://localhost:5173 in your browser.
 
 ## How to Use
 
-1. Open the dashboard — it starts empty
-2. Click **Run Discovery** to scrape live tenders from the CESL portal
-3. The system downloads PDFs, runs the full AI pipeline, and shows results on the dashboard
-4. Click any tender to see its GO/NO-GO verdict with reasoning
-5. Use the **RAG Chat** to ask questions like:
-   - "What is the EMD amount?"
-   - "What are the fleet eligibility criteria?"
-   - "What is the submission deadline?"
+1. Open the dashboard — it starts clean and connects to the live database
+2. Click **Run Discovery** to scrape active tenders from public government portals
+3. The system downloads PDFs, runs structured AI extraction and deterministic screening
+4. Click any tender to view its GO/NO-GO verdict with rule-based criteria evaluations
+5. Use the **RAG Chat** to ask clause-level questions with exact source citations
 
 ---
 
 ## Core Pipeline
 
 ### 1. Discovery
-- Scrapes the CESL Convergence portal for active bus operations tenders
-- Downloads PDFs to `data/raw/`
-- SHA-256 hash deduplication prevents re-processing the same document
+- Scrapes the CESL Convergence portal for active tenders
+- SHA-256 hash deduplication prevents duplicate ingestion
+- Direct database updates when submission deadlines change on the portal
 
 ### 2. Ingestion & Extraction
-- **PyMuPDF** extracts text with page-level tracking
-- **OCR fallback** (OCR.space API) handles scanned image pages
-- **LiteLLM + Gemini** extracts structured data: title, authority, city, deadline, EMD, fleet requirements, turnover criteria
-- Monetary values normalized to INR (handles lakhs, crores)
+- **PyMuPDF** extracts text with page provenance
+- **OCR fallback** (OCR.space API) handles image-only pages
+- **LiteLLM + Gemini** extracts structured schema (fleet size, turnover, EMD, deadlines)
+- Automatic monetary normalization to INR
 
 ### 3. Chunking & Embeddings
-- Page-aware semantic chunking (~1000 chars, 200 char overlap)
-- **Jina AI** generates 768-dimensional embeddings
+- Page-aware semantic chunking
+- **Jina AI** generates 768-dimensional dense vectors
 - Stored in PostgreSQL with `pgvector` HNSW index (cosine similarity)
 
 ### 4. Screening Engine
-- 100% deterministic Python logic — no LLM in the decision path
-- Precedence: `NO-GO > REVIEW > GO`
-  - Any mandatory criterion failure → **NO-GO**
-  - All mandatory pass + ambiguous clauses → **REVIEW**
-  - All criteria pass → **GO**
-- Checks: fleet size, annual turnover, experience years, past contract value, geography
+- 100% deterministic Python evaluation — no LLM hallucinations in eligibility decisions
+- Strict precedence: `NO-GO > REVIEW > GO`
+- Checks fleet size, annual turnover, experience, contract value, and state geography
 
-### 5. RAG Chat
-- Hybrid routing: SQL for deadline/date questions, pgvector for clause questions
-- Anti-hallucination guardrail: refuses to answer when evidence is missing
-- Every answer cites the exact document filename and page number
+### 5. Grounded RAG Chat
+- Hybrid routing: SQL for temporal/date queries, pgvector for clause retrieval
+- Anti-hallucination guardrail: refuses to answer when evidence is absent
+- Verifiable citations with source document name and page number
 
 ---
 
 ## Running Tests
 
+Install development dependencies:
 ```bash
 cd backend
+pip install -r requirements-dev.txt
+```
+
+Run test suite:
+```bash
 python -m pytest tests/ -o pythonpath=. -v
 ```
 
-**Test Coverage:**
-- `test_pdf_parser.py` — PDF extraction, SHA-256 hashing, language guardrails
-- `test_extraction.py` — Currency normalization, schema validation
-- `test_screening.py` — Deterministic screening and NO-GO precedence
-- `test_chunking.py` — Page-aware chunking, vector dimensions
-- `test_embedding_migration.py` — Embedding generation and DB insertion
-- `test_pipeline_orchestration.py` — Full ingestion loop, fallback handling, idempotency
-- `test_emd_and_deadline_catalog.py` — EMD breakdown, deadline extraction
-- `test_rag_pipeline.py` — Query routing, anti-hallucination guardrail, citations
-- `test_api.py` — Health check, concurrent ingestion rejection
+**Automated Test Suite (51/51 Tests Passing):**
+- `test_api.py` — Health checks, dynamic cost tracking, concurrent ingestion lock
+- `test_chunking.py` — Page awareness, vector dimensionality checks
+- `test_discovery_date_parsing.py` — IST timezone (+05:30) validation, direct deadline updates
+- `test_discovery_parser.py` — CESL HTML table parsing against real fixture
+- `test_embedding_migration.py` — Embedding dimension verification and pgvector DB insertion
+- `test_extraction.py` — Currency normalization, metric standardization, schema validation
+- `test_llm_truncation.py` — Truncation recovery and reasoning tag validation
+- `test_migrated_logic.py` — PDF parser validation, zero-hallucination vector checks, screening
+- `test_pdf_parser.py` — Multi-page extraction, SHA-256 idempotency, OCR fallback
+- `test_pipeline_orchestration.py` — Full pipeline loop, heuristic fallbacks, DB idempotency
+- `test_rag_pipeline.py` — Query routing, prompt templates, grounded citations
+- `test_screening.py` — Deterministic evaluation, precedence rules, geographic matching
 
 ---
 
-## Deployment
+## Public Tender Sources
 
-Both frontend and backend are deployed on Vercel with automatic CD from the `main` branch on GitHub.
-
-**Key production config (`backend/vercel.json`):**
-- `maxDuration: 60` — allows heavy PDF processing within Vercel's serverless limits
-
-**Database:** Neon DB (PostgreSQL + pgvector, serverless)
+Official public tenders processed by the platform:
+- [CESL Convergence Portal](https://www.convergence.co.in/tender) — Notice Inviting Tenders (NIT) for electric bus fleet operations
 
 ---
 
-## Tech Stack
+## License
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 18, Vite, Tailwind CSS |
-| Backend | FastAPI, Python 3.11, SQLAlchemy |
-| LLM | Google Gemini via LiteLLM |
-| Embeddings | Jina AI (768-dim) |
-| Database | PostgreSQL 16 + pgvector |
-| Migrations | Alembic |
-| Testing | pytest, Playwright E2E |
-| Deployment | Vercel (frontend + backend), Neon DB |
-| CI | GitHub Actions |
+This project is licensed under the [MIT License](LICENSE).
