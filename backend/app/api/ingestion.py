@@ -75,17 +75,8 @@ async def get_ingestion_job_status(job_id: str, db: Session = Depends(get_db)):
         job = None
 
     if not job:
-        return IngestionJobResponse(
-            job_id=str(job_id),
-            status="COMPLETED",
-            total_documents=4,
-            completed_documents=4,
-            failed_documents=0,
-            current_document=None,
-            started_at=None,
-            completed_at=None,
-            error_message=None
-        )
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Ingestion job {job_id} not found.")
 
     return IngestionJobResponse(
         job_id=str(job.id),

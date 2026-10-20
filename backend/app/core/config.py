@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     TEST_DATABASE_URL: str | None = None
 
     LLM_API_KEY: str = ""
-    LLM_MODEL: str = "groq/openai/gpt-oss-120b"
-    LLM_FALLBACK_MODEL: str = "groq/qwen/qwen3.6-27b"
+    LLM_MODEL: str = "gemini/gemini-flash-latest"
+    LLM_FALLBACK_MODEL: str = "gemini/gemini-2.0-flash"
 
     EMBEDDING_API_KEY: str = ""
     EMBEDDING_MODEL: str = "jina-embeddings-v5-omni-small"
@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     INGESTION_ENABLED: bool = True
     DISCOVERY_ENABLED: bool = False
     DISCOVERY_INTERVAL_MINUTES: int = 60
+
+    OCR_SPACE_API_KEY: str = ""
+    DISCORD_WEBHOOK_URL: str = ""
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env", "../../.env"),

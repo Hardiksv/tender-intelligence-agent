@@ -66,7 +66,6 @@ class LiteLLMClient(AbstractLLMClient):
         models_to_try = [
             self.primary_model,
             self.fallback_model,
-            "groq/qwen/qwen3.6-27b"
         ]
         models_to_try = list(dict.fromkeys(models_to_try))
         last_error = None
@@ -129,7 +128,7 @@ class LiteLLMClient(AbstractLLMClient):
                 os.environ["GEMINI_API_KEY"] = settings.LLM_API_KEY
                 os.environ["GOOGLE_API_KEY"] = settings.LLM_API_KEY
 
-        models_to_try = [self.primary_model, self.fallback_model, "groq/qwen/qwen3.6-27b"]
+        models_to_try = [self.primary_model, self.fallback_model]
         models_to_try = list(dict.fromkeys(models_to_try))
         last_error = None
 
