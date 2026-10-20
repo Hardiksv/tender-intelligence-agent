@@ -3,4 +3,5 @@ test_env
 test_venv_clean
 scratch
 data
-frontend
+backend/.pytest_cache
+backend/__pycache__
